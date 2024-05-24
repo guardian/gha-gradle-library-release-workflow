@@ -138,35 +138,8 @@ jobs:
 #      - name: Debug MIMA assessment
 #        run: |
 #          sbt "show versionPolicyFindIssues"
-      - name: Use sbt-release to construct version.sbt updates
-        run: |
-          git config user.email "${{ needs.init.outputs.key_email }}"
-          git config user.name "$COMMITTER_NAME"
-          
-          sbt_commands_file=$(mktemp)
-          cat << EndOfFile > $sbt_commands_file
-          set releaseVersion := releaseVersion.value.andThen(_ + "${{ needs.init.outputs.version_suffix }}")
-          release with-defaults
-          EndOfFile
-          cat $sbt_commands_file
-          sbt ";< $sbt_commands_file"
-          
-          echo $GITHUB_WORKSPACE
-          cd `mktemp -d`
-          git clone --bare $GITHUB_WORKSPACE repo-with-unsigned-version-update-commits.git
-          rm -Rf $GITHUB_WORKSPACE/*
-          mv repo-with-unsigned-version-update-commits.git $GITHUB_WORKSPACE/
-          ls -lR $GITHUB_WORKSPACE
-      - name: Job summary
-        run: |
-          cat << EndOfFile >> $GITHUB_STEP_SUMMARY
-          # Release $(git describe --tags --abbrev=0)
-          Library built with Java ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}.
-          EndOfFile
-      - uses: actions/cache/save@v4
-        with:
-          path: repo-with-unsigned-version-update-commits.git
-          key: repo-with-unsigned-version-update-commits-${{ env.RUN_ATTEMPT_UID }}
+
+      ### TODO Perhaps we should have some code in here that works out a suitable version number?
 
   push-release-commit:
     name: 🔒 Push Release Commit
@@ -190,11 +163,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: repo
-      - uses: actions/cache/restore@v4
-        with:
-          path: repo-with-unsigned-version-update-commits.git
-          key: repo-with-unsigned-version-update-commits-${{ env.RUN_ATTEMPT_UID }}
-          fail-on-cache-miss: true
       - uses: actions/setup-java@v4
         with:
           distribution: corretto
@@ -212,15 +180,12 @@ jobs:
           echo "GITHUB_REF=$GITHUB_REF"
           
           cd repo-with-unsigned-version-update-commits.git
-          RELEASE_TAG=$(git describe --tags --abbrev=0)
+          RELEASE_TAG= ### TODO work out what the version number should be, eg v1.4.155  ....$(git describe --tags --abbrev=0)
           
           cd ../repo
           
-          git remote add unsigned ../repo-with-unsigned-version-update-commits.git
-          git fetch unsigned
-          
           RELEASE_VERSION=${RELEASE_TAG#"v"}
-          VERSION_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r $RELEASE_TAG | grep version.sbt)
+          VERSION_FILE_PATH=###  TODO - which file do I update? $(git diff-tree --no-commit-id --name-only -r $RELEASE_TAG | grep version.sbt)
           VERSION_FILE_INITIAL_SHA=$( git rev-parse $GITHUB_REF:$VERSION_FILE_PATH )
           VERSION_FILE_RELEASE_SHA=$( git rev-parse $RELEASE_TAG:$VERSION_FILE_PATH )
           VERSION_FILE_RELEASE_CONTENT=$( git cat-file blob $RELEASE_TAG:$VERSION_FILE_PATH | base64 -w0)
@@ -275,13 +240,7 @@ jobs:
           java-version: ${{ needs.generate-version-update-commits.outputs.library_build_major_java_version }}
       - name: Generate artifacts
         run: |
-          cat << EndOfFile > sbt-commands.txt
-          set every sonatypeProjectHosting := Some(xerial.sbt.Sonatype.GitHubHosting("$GITHUB_REPOSITORY_OWNER", "${GITHUB_REPOSITORY#*/}", "${{ needs.init.outputs.key_email }}"))
-          set ThisBuild / publishTo := Some(Resolver.file("foobar", file("$LOCAL_ARTIFACTS_STAGING_PATH")))
-          EndOfFile
-          cat sbt-commands.txt
-          
-          sbt ";< sbt-commands.txt; +publish"
+          ### TODO run gradle to generate local artifacts! folder in $LOCAL_ARTIFACTS_STAGING_PATH
       - name: Record SHA-256 hashes of artifacts
         id: record-hashes
         run: |
