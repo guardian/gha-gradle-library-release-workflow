@@ -209,7 +209,7 @@ jobs:
   push-release-commit:
     name: 🔒 Push Release Commit
     needs: [generate-version-update-commits, init]
-    if: false
+    # if: false
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -364,7 +364,7 @@ jobs:
   create-artifacts:
     name: ⚙️ Create artifacts
     needs: [init, generate-version-update-commits, push-release-commit]
-    if: false
+    # if: false
     runs-on: ubuntu-latest
     env:
       RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release_version }}
@@ -437,7 +437,7 @@ jobs:
   sign:
     name: 🔒 Sign
     needs: [init, push-release-commit, create-artifacts]
-    if: false
+    # if: false
     runs-on: ubuntu-latest
     env:
       KEY_FINGERPRINT: ${{ needs.init.outputs.key_fingerprint }}
@@ -538,7 +538,7 @@ jobs:
   sonatype-release:
     name: 🔒 Sonatype Release
     needs: [push-release-commit, sign]
-    if: false
+    # if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/cache/restore@v4
@@ -580,7 +580,7 @@ jobs:
     name: 🔒 Update GitHub
     needs:  [init, push-release-commit, sign, sonatype-release]
     runs-on: ubuntu-latest
-    if: false
+    # if: false
     permissions:
       contents: write
       pull-requests: write
