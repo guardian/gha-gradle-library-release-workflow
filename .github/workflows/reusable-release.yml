@@ -168,6 +168,14 @@ jobs:
           git config user.email "${{ needs.init.outputs.key_email }}"
           git config user.name "$COMMITTER_NAME"
 
+      - name: Checkout release workflow repository for scripts
+        uses: actions/checkout@v4
+        with:
+          repository: guardian/gha-gradle-library-release-workflow
+          path: gha-gradle-library-release-workflow
+          ref: 'ab/update-to-support-gradle-and-monorepo-configs'
+          sparse-checkout: '.github/scripts/**'
+
       - name: Update version and API files
         env:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
@@ -176,7 +184,7 @@ jobs:
           MODULES: ${{ inputs.MODULES }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version_suffix }}
         run: |
-          .github/scripts/calculate-version.sh
+          bash gha-gradle-library-release-workflow/.github/scripts/calculate-version.sh
 
       - name: Create bare repo with unsigned version update commits
         run: |
