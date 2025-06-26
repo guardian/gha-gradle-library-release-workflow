@@ -10,8 +10,6 @@ if [ -n "$SOURCE_DIR" ]; then
   cd "$SOURCE_DIR"
 fi
 
-pwd
-
 # If the version file does not exist, create it with a default version
 if [ ! -f "$VERSION_FILE" ]; then
   echo "0.0.1" > "$VERSION_FILE"
