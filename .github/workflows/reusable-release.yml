@@ -174,7 +174,7 @@ jobs:
           repository: guardian/gha-gradle-library-release-workflow
           path: gha-gradle-library-release-workflow
           ref: 'ab/update-to-support-gradle-and-monorepo-configs'
-          sparse-checkout: '.github/scripts/**'
+          sparse-checkout: '.github/scripts'
 
       - name: Update version and API files
         env:
