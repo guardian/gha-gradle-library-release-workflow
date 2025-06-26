@@ -1,19 +1,19 @@
-name: Version Update
+name: Gradle Library Release Workflow
 
 on:
   workflow_call:
     inputs:
-      MODULES:
-        description: 'Comma-separated list of module names to build (e.g. "core,utils,api").'
-        required: true
-        type: string
       SOURCE_DIR:
         description: 'Path to source directory. For monorepos, this is the path to the library source directory. Leave empty for the root directory.'
         required: false
         default: ''
         type: string
+      MODULES:
+        description: 'Comma-separated list of module names to build (e.g. "core,utils,api").'
+        required: true
+        type: string
       API_FILE:
-        description: 'Path to API file relative to the source directory.'
+        description: 'Path to API file relative to the module directory.'
         required: false
         default: 'api/api.txt'
         type: string
@@ -202,44 +202,70 @@ jobs:
             echo "::error title=Invalid version format::Version file '$VERSION_FILE' must contain a valid semantic version (e.g., 1.0.0)."
             exit 1
           fi
-
-          # Create a temporary copy of the API file for comparison
-          cp "$API_FILE" "$TMP_API_FILE"
-
-          # Check API compatibility
-          set +e
-          ./gradlew :source:metalavaCheckCompatibilityRelease
-          RESULT=$?
-          set -e
-
-          if [ $RESULT -ne 0 ]; then
-            # If compatibility check fails, increment major version and reset minor and patch
+          
+          # Iterate over modules and determine the highest version bump required
+          MODULES="${{ inputs.MODULES }}"
+          IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
+          
+          HIGHEST_BUMP="patch"
+          
+          for mod in "${MOD_ARRAY[@]}"; do
+            MOD=$(echo "${mod}" | xargs)
+            MOD_API_FILE="${MOD}/${API_FILE}"
+          
+            TMP_API_FILE=$(mktemp)
+            cp "$MOD_API_FILE" "$TMP_API_FILE"
+          
+            # Check API compatibility
+            set +e
+            ./gradlew ":${MOD}:metalavaCheckCompatibilityRelease"
+            RESULT=$?
+            set -e
+          
+            if [ $RESULT -ne 0 ]; then
+              ./gradlew ":${MOD}:metalavaGenerateSignatureRelease"
+              BUMP="major"
+            else
+              ./gradlew ":${MOD}:metalavaGenerateSignatureRelease"
+              if ! cmp -s "$MOD_API_FILE" "$TMP_API_FILE"; then
+                BUMP="minor"
+              else
+                BUMP="patch"
+              fi
+            fi
+          
+            # Determine the highest bump needed
+            if [ "$BUMP" = "major" ]; then
+              HIGHEST_BUMP="major"
+            elif [ "$BUMP" = "minor" ] && [ "$HIGHEST_BUMP" = "patch" ]; then
+              HIGHEST_BUMP="minor"
+            fi
+          
+            # Add this module's API file to the commit
+            git add "$MOD_API_FILE"
+          
+            rm -f "$TMP_API_FILE"
+          done
+          
+          # Apply the highest bump
+          if [ "$HIGHEST_BUMP" = "major" ]; then
             MAJOR=$((MAJOR + 1))
             MINOR=0
             PATCH=0
-            # Generate new API signature
-            ./gradlew :source:metalavaGenerateSignatureRelease
+          elif [ "$HIGHEST_BUMP" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
           else
-            # Generate new API signature and compare with the previous one
-            ./gradlew :source:metalavaGenerateSignatureRelease
-            if ! cmp -s "$API_FILE" "$TMP_API_FILE"; then
-              # If API file has changed, increment minor version and reset patch
-              MINOR=$((MINOR + 1))
-              PATCH=0
-            else
-              # If API file has not changed, increment patch version
-              PATCH=$((PATCH + 1))
-            fi
+            PATCH=$((PATCH + 1))
           fi
-          
-          
+
           # Update version file with the new version
           echo "$MAJOR.$MINOR.$PATCH" > "$VERSION_FILE"
 
           echo "Updated version to $MAJOR.$MINOR.$PATCH"
           
-          # Commit the updated version and API files
-          git add "$VERSION_FILE" "$API_FILE"
+          # Commit the updated version
+          git add "$VERSION_FILE"
           git commit -m "chore: update version to $MAJOR.$MINOR.$PATCH"
           # Add version_suffix to the version and tag the commit with the new version number
           git tag "v$MAJOR.$MINOR.$PATCH${{ needs.init.outputs.version_suffix }}"
@@ -277,13 +303,11 @@ jobs:
       release_notes_url: ${{ steps.create-commit.outputs.release_notes_url }}
       release_version: ${{ steps.create-commit.outputs.release_version }}
       release_commit_id: ${{ steps.create-commit.outputs.release_commit_id }}
-      version_commit_id: ${{ steps.create-commit.outputs.version_commit_id }}
       version_file_path: ${{ steps.create-commit.outputs.version_file_path }}
       version_file_release_sha: ${{ steps.create-commit.outputs.version_file_release_sha }}
       version_file_post_release_content: ${{ steps.create-commit.outputs.version_file_post_release_content }}
-      api_file_path: ${{ steps.create-commit.outputs.api_file_path }}
-      api_file_release_sha: ${{ steps.create-commit.outputs.api_file_release_sha }}
-      api_file_post_release_content: ${{ steps.create-commit.outputs.api_file_post_release_content }}
+      api_files: ${{ steps.create-commit.outputs.api_files }}
+
     steps:
       - name: Generate app token
         id: generate-github-app-token
@@ -358,11 +382,36 @@ jobs:
           VERSION_FILE_RELEASE_CONTENT=$( git cat-file blob $RELEASE_TAG:$VERSION_FILE_PATH | base64 -w0)
           VERSION_FILE_POST_RELEASE_CONTENT=$( git cat-file blob unsigned/$GITHUB_REF_NAME:$VERSION_FILE_PATH | base64 -w0)
 
-          API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r $RELEASE_TAG | grep ${{ inputs.API_FILE }})
-          API_FILE_INITIAL_SHA=$( git rev-parse $GITHUB_REF:$API_FILE_PATH )
-          API_FILE_RELEASE_SHA=$( git rev-parse $RELEASE_TAG:$API_FILE_PATH )
-          API_FILE_RELEASE_CONTENT=$( git cat-file blob $RELEASE_TAG:$API_FILE_PATH | base64 -w0)
-          API_FILE_POST_RELEASE_CONTENT=$( git cat-file blob unsigned/$GITHUB_REF_NAME:$API_FILE_PATH | base64 -w0)
+          # Create temporary branch to push the release commit- required for PREVIEW releases
+          gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
+          
+          # Parse modules and iterate over them, committing API files and collecting their details
+          # in a json object for later use
+          MODULES="${{ inputs.MODULES }}"
+          IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
+          
+          API_FILES_JSON="["
+          
+          for mod in "${MOD_ARRAY[@]}"; do
+            MOD=$(echo "${mod}" | xargs)
+            API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r $RELEASE_TAG | grep "${MOD}/${{ inputs.API_FILE }}")
+            API_FILE_INITIAL_SHA=$(git rev-parse $GITHUB_REF:"$API_FILE_PATH")
+            API_FILE_RELEASE_SHA=$(git rev-parse $RELEASE_TAG:"$API_FILE_PATH")
+            API_FILE_RELEASE_CONTENT=$(git cat-file blob $RELEASE_TAG:"$API_FILE_PATH" | base64 -w0)
+            API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/$GITHUB_REF_NAME:"$API_FILE_PATH" | base64 -w0)
+          
+            # Commit the API file changes for module
+            api_commit_id=$(gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
+              --field branch="$TEMPORARY_BRANCH" \
+              --field message="Update public API file for module $MOD for $RELEASE_TAG" \
+              --field sha="$API_FILE_INITIAL_SHA" \
+              --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha')
+          
+            API_FILES_JSON="${API_FILES_JSON}{\"module\":\"$MOD\",\"api_file_path\":\"$API_FILE_PATH\",\"api_file_release_sha\":\"$API_FILE_RELEASE_SHA\",\"api_file_post_release_content\":\"$API_FILE_POST_RELEASE_CONTENT\"},"
+          done
+          
+          # Remove trailing comma and close JSON array
+          API_FILES_JSON="${API_FILES_JSON%,}]"
           
           cd $BASE_PATH
           
@@ -378,38 +427,23 @@ jobs:
           Release-Notes: $RELEASE_NOTES_URL
           EndOfFile
           
-          # Create temporary branch to push the release commit- required for PREVIEW releases
-          gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
-          
+          # Commit the version file
           version_commit_id=$(gh api --method PUT /repos/:owner/:repo/contents/$VERSION_FILE_PATH \
             --field branch="$TEMPORARY_BRANCH" \
             --field message="@commit-message.txt" \
             --field sha="$VERSION_FILE_INITIAL_SHA" \
             --field content="$VERSION_FILE_RELEASE_CONTENT" --jq '.commit.sha')
           
-          # Also update the API file in the same commit
-          api_commit_id=$(gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
-            --field branch="$TEMPORARY_BRANCH" \
-            --field message="@commit-message.txt" \
-            --field sha="$API_FILE_INITIAL_SHA" \
-            --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha')
-          
-          echo "VERSION_COMMIT_ID=$version_commit_id"
-          echo "API_COMMIT_ID_=$api_commit_id"
-
+          # Set output  
           cat << EndOfFile >> $GITHUB_OUTPUT
           release_tag=$RELEASE_TAG
           release_notes_url=$RELEASE_NOTES_URL
           release_version=$RELEASE_VERSION
-          release_commit_id=$api_commit_id
-          version_commit_id=$version_commit_id
+          release_commit_id=$version_commit_id
           version_file_path=$VERSION_FILE_PATH
           version_file_release_sha=$VERSION_FILE_RELEASE_SHA
           version_file_post_release_content=$VERSION_FILE_POST_RELEASE_CONTENT
-          api_commit_id=$api_commit_id
-          api_file_path=$API_FILE_PATH
-          api_file_release_sha=$API_FILE_RELEASE_SHA
-          api_file_post_release_content=$API_FILE_POST_RELEASE_CONTENT
+          api_files=$API_FILES_JSON
           EndOfFile
 
   create-artifacts:
@@ -456,8 +490,10 @@ jobs:
           MODULES="${{ inputs.MODULES }}"
           if [ -n "$MODULES" ]; then
             IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
+
             for mod in "${MOD_ARRAY[@]}"; do
-              ./gradlew :source:publishReleasePublicationToGusourceRepository -Prepo.local=$LOCAL_ARTIFACTS_STAGING_PATH
+              MOD=$(echo "${mod}" | xargs)
+              ./gradlew ":${MOD}:publishReleasePublicationToCustomRepository" -Prepo.local=$LOCAL_ARTIFACTS_STAGING_PATH
             done
           fi
           
@@ -533,20 +569,8 @@ jobs:
 
       - name: Sign artifacts
         run: |
-          # Print out the staging directory before signing
-          echo "Current directory is ${pwd}"
-          echo "Signing artifacts in $LOCAL_ARTIFACTS_STAGING_PATH"
-          echo "Contents of staging directory before signing:"
-          ls -lR $LOCAL_ARTIFACTS_STAGING_PATH
-
           echo "KEY_FINGERPRINT=$KEY_FINGERPRINT"
           find $LOCAL_ARTIFACTS_STAGING_PATH -type f -exec gpg -a --local-user "$KEY_FINGERPRINT" --detach-sign {} \;
-
-          # Print out the staging directory to confirm contents and signatures
-          echo "Contents of staging directory after signing:"
-          ls -lR $LOCAL_ARTIFACTS_STAGING_PATH
-          echo "Contents of working directory after signing:"
-          ls -al
 
       - name: "Full Main-Branch release: Add release commit (from temporary release branch) to default branch"
         if: needs.init.outputs.release_type == 'FULL_MAIN_BRANCH'
@@ -631,9 +655,6 @@ jobs:
 
       - name: Release
         run: |
-          # Print out the staging directory to confirm contents
-          ls -lR $LOCAL_ARTIFACTS_STAGING_PATH
-
           sbt "sonaRelease"
 
 
@@ -682,19 +703,27 @@ jobs:
           gh release create $RELEASE_TAG --verify-tag --generate-notes --notes "Release run: $GITHUB_WORKFLOW_RUN_LINK"
           echo "GitHub Release notes: [$RELEASE_TAG]($RELEASE_NOTES_URL)" >> $GITHUB_STEP_SUMMARY
           
-          # First update the API file
-          gh api --method PUT /repos/:owner/:repo/contents/${{ needs.push-release-commit.outputs.api_file_path }} \
-            --field message="Update public API file for $RELEASE_TAG" \
-            --field sha="${{ needs.push-release-commit.outputs.api_file_release_sha }}" \
-            --field content="${{ needs.push-release-commit.outputs.api_file_post_release_content }}"
-
+          # Commit API files for each module
+          API_FILES_JSON='${{ needs.push-release-commit.outputs.api_files }}'
+          echo "$API_FILES_JSON" | jq -c '.[]' | while read -r api_file; do
+            MOD=$(echo "$api_file" | jq -r '.module')
+            API_FILE_PATH=$(echo "$api_file" | jq -r '.api_file_path')
+            API_FILE_RELEASE_SHA=$(echo "$api_file" | jq -r '.api_file_release_sha')
+            API_FILE_POST_RELEASE_CONTENT=$(echo "$api_file" | jq -r '.api_file_post_release_content')
+            gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
+              --field message="Update public API file for $MOD for $RELEASE_TAG" \
+              --field sha="$API_FILE_RELEASE_SHA" \
+              --field content="$API_FILE_POST_RELEASE_CONTENT"
+          done
+          
+          
+          # Then commit the version file
           cat << EndOfFile > commit-message.txt
           Post-release of $RELEASE_TAG by @${{github.actor}}: set version
           
           Setting snapshot version after @${{github.actor}} published $RELEASE_NOTES_URL
           EndOfFile
           
-          # Then update the version file
           gh api --method PUT /repos/:owner/:repo/contents/${{ needs.push-release-commit.outputs.version_file_path }} \
             --field message="@commit-message.txt" \
             --field sha="${{ needs.push-release-commit.outputs.version_file_release_sha }}" \
