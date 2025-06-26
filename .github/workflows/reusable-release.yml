@@ -250,6 +250,14 @@ jobs:
           java-version: 17
           gpg-private-key: ${{ secrets.PGP_PRIVATE_KEY }}
 
+      - name: Checkout release workflow repository for scripts
+        uses: actions/checkout@v4
+        with:
+          repository: guardian/gha-gradle-library-release-workflow
+          path: gha-gradle-library-release-workflow
+          ref: 'ab/update-to-support-gradle-and-monorepo-configs'
+          sparse-checkout: '.github/scripts'
+
       - name: Create commit
         id: create-commit
         env:
@@ -257,109 +265,19 @@ jobs:
           KEY_EMAIL: ${{ needs.init.outputs.key_email }}
           GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
+          SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
+          VERSION_FILE: ${{ inputs.VERSION_FILE }}
+          API_FILE: ${{ inputs.API_FILE }}
+          MODULES: ${{ inputs.MODULES }}
+          RELEASE_TYPE: ${{ needs.init.outputs.release_type }}
+          VERSION_SUFFIX: ${{ needs.init.outputs.version_suffix }}
+          TEMPORARY_BRANCH: ${{ env.TEMPORARY_BRANCH }}
+          GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
-          echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
-          echo "GITHUB_REF=$GITHUB_REF"
-          
-          BASE_PATH=$(pwd)
-
-          cd repo-with-unsigned-version-update-commits.git
-          RELEASE_TAG=$(git describe --tags --abbrev=0)
-
-          INCOMING_REPO_PATH="$(pwd)"
-          
-          cd ../repo
-
-          SOURCE_DIR="${{ inputs.SOURCE_DIR }}"
-          if [ -n "$SOURCE_DIR" ]; then
-            if [ ! -d "$SOURCE_DIR" ]; then
-              echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
-              exit 1
-            fi
-            cd "$SOURCE_DIR"
-          fi
-          
-          git remote add unsigned $INCOMING_REPO_PATH
-          git fetch unsigned
-          
-          RELEASE_VERSION=${RELEASE_TAG#"v"}
-          
-          if [[ "${{ needs.init.outputs.release_type }}" = "FULL_MAIN_BRANCH" ]]; then
-            RELEASE_NOTES_URL=$GITHUB_REPO_URL/releases/tag/$RELEASE_TAG
-          else
-            # Use the PR url as the release notes url when doing a 'preview' release
-            RELEASE_NOTES_URL=$( gh pr view $GITHUB_REF_NAME --json url -q .url )
-          fi
-          
-          VERSION_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r $RELEASE_TAG | grep ${{ inputs.VERSION_FILE }})
-          VERSION_FILE_INITIAL_SHA=$( git rev-parse $GITHUB_REF:$VERSION_FILE_PATH )
-          VERSION_FILE_RELEASE_SHA=$( git rev-parse $RELEASE_TAG:$VERSION_FILE_PATH )
-          VERSION_FILE_RELEASE_CONTENT=$( git cat-file blob $RELEASE_TAG:$VERSION_FILE_PATH | base64 -w0)
-          VERSION_FILE_POST_RELEASE_CONTENT=$( git cat-file blob unsigned/$GITHUB_REF_NAME:$VERSION_FILE_PATH | base64 -w0)
-
-          # Create temporary branch to push the release commit- required for PREVIEW releases
-          gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
-          
-          # Parse modules and iterate over them, committing API files and collecting their details
-          # in a json object for later use
-          MODULES="${{ inputs.MODULES }}"
-          IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
-          
-          API_FILES_JSON="["
-          
-          for mod in "${MOD_ARRAY[@]}"; do
-            MOD=$(echo "${mod}" | xargs)
-            API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r $RELEASE_TAG | grep "${MOD}/${{ inputs.API_FILE }}")
-            API_FILE_INITIAL_SHA=$(git rev-parse $GITHUB_REF:"$API_FILE_PATH")
-            API_FILE_RELEASE_SHA=$(git rev-parse $RELEASE_TAG:"$API_FILE_PATH")
-            API_FILE_RELEASE_CONTENT=$(git cat-file blob $RELEASE_TAG:"$API_FILE_PATH" | base64 -w0)
-            API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/$GITHUB_REF_NAME:"$API_FILE_PATH" | base64 -w0)
-          
-            # Commit the API file changes for module
-            api_commit_id=$(gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
-              --field branch="$TEMPORARY_BRANCH" \
-              --field message="Update public API file for module $MOD for $RELEASE_TAG" \
-              --field sha="$API_FILE_INITIAL_SHA" \
-              --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha')
-          
-            API_FILES_JSON="${API_FILES_JSON}{\"module\":\"$MOD\",\"api_file_path\":\"$API_FILE_PATH\",\"api_file_release_sha\":\"$API_FILE_RELEASE_SHA\",\"api_file_post_release_content\":\"$API_FILE_POST_RELEASE_CONTENT\"},"
-          done
-          
-          # Remove trailing comma and close JSON array
-          API_FILES_JSON="${API_FILES_JSON%,}]"
-          
-          cd $BASE_PATH
-          
-          cat << EndOfFile > commit-message.txt
-          $RELEASE_TAG published by ${{github.actor}}
-          
-          ${{github.actor}} published release version $RELEASE_VERSION
-          using gha-gradle-library-release-workflow: https://github.com/guardian/gha-gradle-library-release-workflow
-          
-          Release-Version: $RELEASE_VERSION
-          Release-Initiated-By: ${{ github.server_url }}/${{github.actor}}
-          Release-Workflow-Run: $GITHUB_REPO_URL/actions/runs/${{ github.run_id }}
-          Release-Notes: $RELEASE_NOTES_URL
-          EndOfFile
-          
-          # Commit the version file
-          version_commit_id=$(gh api --method PUT /repos/:owner/:repo/contents/$VERSION_FILE_PATH \
-            --field branch="$TEMPORARY_BRANCH" \
-            --field message="@commit-message.txt" \
-            --field sha="$VERSION_FILE_INITIAL_SHA" \
-            --field content="$VERSION_FILE_RELEASE_CONTENT" --jq '.commit.sha')
-          
-          # Set output  
-          cat << EndOfFile >> $GITHUB_OUTPUT
-          release_tag=$RELEASE_TAG
-          release_notes_url=$RELEASE_NOTES_URL
-          release_version=$RELEASE_VERSION
-          release_commit_id=$version_commit_id
-          version_file_path=$VERSION_FILE_PATH
-          version_file_release_sha=$VERSION_FILE_RELEASE_SHA
-          version_file_post_release_content=$VERSION_FILE_POST_RELEASE_CONTENT
-          api_files=$API_FILES_JSON
-          EndOfFile
+          bash gha-gradle-library-release-workflow/.github/scripts/create-unsigned-commit.sh
 
   create-artifacts:
     name: ⚙️ Create artifacts
