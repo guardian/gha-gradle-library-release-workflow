@@ -248,7 +248,7 @@ jobs:
           bash gha-gradle-library-release-workflow/.github/scripts/create-unsigned-commit.sh
 
   create-artifacts:
-    name: ⚙️ Create artifacts
+    name: 🎊️ Create artifacts
     needs: [init, generate-version-update-commits, push-release-commit]
     runs-on: ubuntu-latest
     env:
