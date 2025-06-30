@@ -64,10 +64,10 @@ jobs:
     name: 🔒 Init
     runs-on: ubuntu-latest
     outputs:
-      key_fingerprint: ${{ steps.read-identifiers.outputs.key_fingerprint }}
-      key_email: ${{ steps.read-identifiers.outputs.key_email }}
-      release_type: ${{ steps.generate-version-suffix.outputs.release_type }}
-      version_suffix: ${{ steps.generate-version-suffix.outputs.version_suffix }}
+      key_fingerprint: ${{ steps.init.outputs.key_fingerprint }}
+      key_email: ${{ steps.init.outputs.key_email }}
+      release_type: ${{ steps.init.outputs.release_type }}
+      version_suffix: ${{ steps.init.outputs.version_suffix }}
     steps:
 
       - uses: actions/checkout@v4
