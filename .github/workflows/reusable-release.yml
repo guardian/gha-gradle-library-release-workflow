@@ -116,7 +116,7 @@ jobs:
 
 
   generate-version-update-commits:
-    name: 🤸🏽 Generate version update commits
+    name: 🎊 Versioning
     runs-on: ubuntu-latest
     needs: init
     outputs:
