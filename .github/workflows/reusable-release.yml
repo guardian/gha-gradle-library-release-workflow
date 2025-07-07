@@ -83,7 +83,7 @@ jobs:
     steps:
       - name: Versioning
         id: versioning
-        uses: ./github/actions/versioning
+        uses: ./github/actions/versioning@ab/update-to-support-gradle-and-monorepo-configs
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
@@ -105,14 +105,14 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     outputs:
-      release-tag: ${{ steps.act.outputs.release-tag }}
-      release-notes-url: ${{ steps.act.outputs.release-notes-url }}
-      release-version: ${{ steps.act.outputs.release-version }}
-      release-commit-id: ${{ steps.act.outputs.release-commit-id }}
-      version-file-path: ${{ steps.act.outputs.version-file-path }}
-      version-file-release-sha: ${{ steps.act.outputs.version-file-release-sha }}
-      version-file-post-release-content: ${{ steps.act.outputs.version-file-post-release-content }}
-      temporary-branch: ${{ steps.act.outputs.temporary-branch }}
+      release-tag: ${{ steps.create-commit.outputs.release-tag }}
+      release-notes-url: ${{ steps.create-commit.outputs.release-notes-url }}
+      release-version: ${{ steps.create-commit.outputs.release-version }}
+      release-commit-id: ${{ steps.create-commit.outputs.release-commit-id }}
+      version-file-path: ${{ steps.create-commit.outputs.version-file-path }}
+      version-file-release-sha: ${{ steps.create-commit.outputs.version-file-release-sha }}
+      version-file-post-release-content: ${{ steps.create-commit.outputs.version-file-post-release-content }}
+      temporary-branch: ${{ steps.create-commit.outputs.temporary-branch }}
       api_files: ${{ steps.create-commit.outputs.api_files }}
 
     steps:
@@ -183,7 +183,7 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
     outputs:
-      artifact-sha256sums: ${{ steps.act.outputs.artifact-sha256sums }}
+      artifact-sha256sums: ${{ steps.record-hashes.outputs.artifact-sha256sums }}
     steps:
       # - id: act
       #   uses: guardian/gha-scala-library-release-workflow/actions/create-artifacts@main
@@ -244,7 +244,7 @@ jobs:
 
            cd $LOCAL_ARTIFACTS_STAGING_PATH
            {
-             echo 'ARTIFACT_SHA256SUMS<<EOF'
+             echo 'artifact-sha256sums<<EOF'
              sha256deep -r -l .
              echo EOF
            } >> "$GITHUB_OUTPUT"
