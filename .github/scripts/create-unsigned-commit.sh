@@ -94,7 +94,7 @@ version_commit_id=$(gh api --method PUT /repos/:owner/:repo/contents/"$VERSION_F
 cat << EndOfFile >> "$GITHUB_OUTPUT"
 release_tag=$RELEASE_TAG
 release_notes_url=$RELEASE_NOTES_URL
-release_version=$RELEASE_VERSION
+release-version=$RELEASE_VERSION
 release_commit_id=$version_commit_id
 version_file_path=$VERSION_FILE_PATH
 version_file_release_sha=$VERSION_FILE_RELEASE_SHA

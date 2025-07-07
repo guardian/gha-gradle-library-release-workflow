@@ -17,9 +17,7 @@ fi
 
 # Read major, minor, and patch version from the version file
 VERSION=$(cat "$VERSION_FILE" | tr -d ' \n\r')
-IFS='.' read -r MAJOR MINOR PATCH <<EOF
-$VERSION
-EOF
+IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
 
 # Validate version format
 if ! [[ "$MAJOR" =~ ^[0-9]+$ && "$MINOR" =~ ^[0-9]+$ && "$PATCH" =~ ^[0-9]+$ ]]; then
