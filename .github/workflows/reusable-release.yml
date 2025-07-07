@@ -83,7 +83,7 @@ jobs:
     steps:
       - name: Versioning
         id: versioning
-        uses: ./github/actions/versioning@ab/update-to-support-gradle-and-monorepo-configs
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/versioning@ab/update-to-support-gradle-and-monorepo-configs
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
