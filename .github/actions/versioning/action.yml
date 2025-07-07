@@ -23,6 +23,11 @@ inputs:
   PGP_KEY_EMAIL:
     description: 'PGP key email for git config.'
     required: true
+outputs:
+  library-build-major-java-version:
+    description: "The major version of Java (eg '21', '17', or '11') the library should be built with"
+    value: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
+
 runs:
   using: "composite"
   steps:
