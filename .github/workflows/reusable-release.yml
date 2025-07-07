@@ -113,7 +113,7 @@ jobs:
       version-file-release-sha: ${{ steps.create-commit.outputs.version-file-release-sha }}
       version-file-post-release-content: ${{ steps.create-commit.outputs.version-file-post-release-content }}
       temporary-branch: ${{ steps.create-commit.outputs.temporary-branch }}
-      api_files: ${{ steps.create-commit.outputs.api_files }}
+      api-files: ${{ steps.create-commit.outputs.api-files }}
 
     steps:
       # - id: act
@@ -196,9 +196,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.push-release-commit.outputs.release-commit-id }}
-
-      - run: |
-          echo "Java version for library build: ${{ needs.versioning.outputs.library-build-major-java-version }}"
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -345,7 +342,7 @@ jobs:
           echo "GitHub Release notes: [$RELEASE_TAG]($RELEASE_NOTES_URL)" >> $GITHUB_STEP_SUMMARY
           
           # Commit API files for each module
-          API_FILES_JSON='${{ needs.push-release-commit.outputs.api_files }}'
+          API_FILES_JSON='${{ needs.push-release-commit.outputs.api-files }}'
           echo "$API_FILES_JSON" | jq -c '.[]' | while read -r api_file; do
             MOD=$(echo "$api_file" | jq -r '.module')
             API_FILE_PATH=$(echo "$api_file" | jq -r '.api_file_path')
