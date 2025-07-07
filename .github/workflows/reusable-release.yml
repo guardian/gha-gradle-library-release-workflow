@@ -79,95 +79,18 @@ jobs:
     needs: init
     runs-on: ubuntu-latest
     outputs:
-      library_build_major_java_version: ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}
+      library_build_major_java_version: ${{ steps.versioning.outputs.library_build_major_java_version }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Establish library build Java version
-        id: establish_java_for_library_build
-        run: |
-          SOURCE_DIR="${{ inputs.SOURCE_DIR }}"
-          if [ -n "$SOURCE_DIR" ]; then
-            if [ ! -d "$SOURCE_DIR" ]; then
-              echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
-              exit 1
-            fi
-            cd "$SOURCE_DIR"
-          fi
-          
-          # Check if .tool-versions file exists
-          if [ ! -f .tool-versions ]; then
-            echo "::error title=Missing .tool-versions file::gha-gradle-library-release-workflow requires an asdf-format .tool-versions file to establish the Java version for the build."
-            exit 1
-          fi
-          
-          # Check if the file contains a Java version
-          LIBRARY_BUILD_MAJOR_JAVA_VERSION=$( grep -Eo 'java [[:alnum:]-]+-[[:digit:]]+' .tool-versions | rev | cut -d'-' -f1 | rev )
-          echo "Using Java $LIBRARY_BUILD_MAJOR_JAVA_VERSION"
-          if [ -z "${LIBRARY_BUILD_MAJOR_JAVA_VERSION}" ]; then
-            echo "::error title=Missing Java version in .tool-versions file::Could not establish the library's required Java version - the '.tool-versions' file should have a line like 'java corretto-21.0.3.9.1'."
-            exit 1
-          fi
-          
-          # Set the output variable for the Java version
-          cat << EndOfFile >> $GITHUB_OUTPUT
-          library_build_major_java_version=$LIBRARY_BUILD_MAJOR_JAVA_VERSION
-          EndOfFile
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Versioning
+        id: versioning
+        uses: ./github/actions/versioning
         with:
-          java-version: ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: wrapper
-
-      - name: Checkout release workflow repository for scripts
-        uses: actions/checkout@v4
-        with:
-          repository: guardian/gha-gradle-library-release-workflow
-          path: gha-gradle-library-release-workflow
-          ref: 'ab/update-to-support-gradle-and-monorepo-configs'
-          sparse-checkout: '.github/scripts'
-
-      - name: Set up Git user
-        run: |
-          git config user.email "${{ needs.init.outputs.pgp-key-email }}"
-          git config user.name "$COMMITTER_NAME"
-
-      - name: Update version and API files
-        env:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
-          VERSION_FILE: ${{ inputs.VERSION_FILE }}
-          API_FILE: ${{ inputs.API_FILE }}
           MODULES: ${{ inputs.MODULES }}
-          VERSION_SUFFIX: ${{ needs.init.outputs.version_suffix }}
-        run: |
-          bash gha-gradle-library-release-workflow/.github/scripts/calculate-version.sh
-
-      - name: Create bare repo with unsigned version update commits
-        run: |
-          cd `mktemp -d`
-          git clone --bare $GITHUB_WORKSPACE repo-with-unsigned-version-update-commits.git
-          rm -Rf $GITHUB_WORKSPACE/*
-          mv repo-with-unsigned-version-update-commits.git $GITHUB_WORKSPACE/
-          ls -lR $GITHUB_WORKSPACE
-
-      - name: Job summary
-        run: |
-          cat << EndOfFile >> $GITHUB_STEP_SUMMARY
-          Release $(git describe --tags --abbrev=0)
-          Library built with Java ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}.
-          EndOfFile
-
-      - uses: actions/cache/save@v4
-        with:
-          path: repo-with-unsigned-version-update-commits.git
-          key: repo-with-unsigned-version-update-commits-${{ env.RUN_ATTEMPT_UID }}
+          API_FILE: ${{ inputs.API_FILE }}
+          VERSION_FILE: ${{ inputs.VERSION_FILE }}
+          VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
+          PGP_KEY_EMAIL: ${{ needs.init.outputs.pgp-key-email }}
 
   push-release-commit:
     name: 🔒 Push Release Commit

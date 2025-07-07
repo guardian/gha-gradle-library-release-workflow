@@ -1,0 +1,121 @@
+name: "Versioning"
+description: "Composite action for library versioning"
+inputs:
+  SOURCE_DIR:
+    description: 'Path to source directory.'
+    required: false
+    default: ''
+  MODULES:
+    description: 'Comma-separated list of module names to build.'
+    required: true
+  API_FILE:
+    description: 'Path to API file relative to the module directory.'
+    required: false
+    default: 'api/api.txt'
+  VERSION_FILE:
+    description: 'Path to version file relative to the source directory.'
+    required: false
+    default: 'version.txt'
+  VERSION_SUFFIX:
+    description: 'Suffix to append to the version.'
+    required: false
+    default: ''
+  PGP_KEY_EMAIL:
+    description: 'PGP key email for git config.'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Establish library build Java version
+      id: establish_java_for_library_build
+      shell: bash
+      run: |
+        SOURCE_DIR="${{ inputs.SOURCE_DIR }}"
+        if [ -n "$SOURCE_DIR" ]; then
+          if [ ! -d "$SOURCE_DIR" ]; then
+            echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
+            exit 1
+          fi
+          cd "$SOURCE_DIR"
+        fi
+
+        # Check if .tool-versions file exists
+        if [ ! -f .tool-versions ]; then
+          echo "::error title=Missing .tool-versions file::gha-gradle-library-release-workflow requires an asdf-format .tool-versions file to establish the Java version for the build."
+          exit 1
+        fi
+
+        # Check if the file contains a Java version
+        LIBRARY_BUILD_MAJOR_JAVA_VERSION=$( grep -Eo 'java [[:alnum:]-]+-[[:digit:]]+' .tool-versions | rev | cut -d'-' -f1 | rev )
+        echo "Using Java $LIBRARY_BUILD_MAJOR_JAVA_VERSION"
+        if [ -z "${LIBRARY_BUILD_MAJOR_JAVA_VERSION}" ]; then
+          echo "::error title=Missing Java version in .tool-versions file::Could not establish the library's required Java version - the '.tool-versions' file should have a line like 'java corretto-21.0.3.9.1'."
+          exit 1
+        fi
+
+        # Set the output variable for the Java version
+        cat << EndOfFile >> $GITHUB_OUTPUT
+        library_build_major_java_version=$LIBRARY_BUILD_MAJOR_JAVA_VERSION
+        EndOfFile
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: wrapper
+
+    - name: Checkout release workflow repository for scripts
+      uses: actions/checkout@v4
+      with:
+        repository: guardian/gha-gradle-library-release-workflow
+        path: gha-gradle-library-release-workflow
+        ref: 'ab/update-to-support-gradle-and-monorepo-configs'
+        sparse-checkout: '.github/scripts'
+
+    - name: Set up Git user
+      shell: bash
+      run: |
+        git config user.email "${{ inputs.PGP_KEY_EMAIL }}"
+        git config user.name "$COMMITTER_NAME"
+
+    - name: Update version and API files
+      env:
+        SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
+        VERSION_FILE: ${{ inputs.VERSION_FILE }}
+        API_FILE: ${{ inputs.API_FILE }}
+        MODULES: ${{ inputs.MODULES }}
+        VERSION_SUFFIX: ${{ inputs.VERSION_SUFFIX }}
+      shell: bash
+      run: |
+        bash gha-gradle-library-release-workflow/.github/scripts/calculate-version.sh
+
+    - name: Create bare repo with unsigned version update commits
+      shell: bash
+      run: |
+        cd `mktemp -d`
+        git clone --bare $GITHUB_WORKSPACE repo-with-unsigned-version-update-commits.git
+        rm -Rf $GITHUB_WORKSPACE/*
+        mv repo-with-unsigned-version-update-commits.git $GITHUB_WORKSPACE/
+        ls -lR $GITHUB_WORKSPACE
+
+    - name: Job summary
+      shell: bash
+      run: |
+        cat << EndOfFile >> $GITHUB_STEP_SUMMARY
+        Release $(git describe --tags --abbrev=0)
+        Library built with Java ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}.
+        EndOfFile
+
+    - uses: actions/cache/save@v4
+      with:
+        path: repo-with-unsigned-version-update-commits.git
+        key: repo-with-unsigned-version-update-commits-${{ env.RUN_ATTEMPT_UID }}
+
