@@ -252,11 +252,11 @@ jobs:
              echo EOF
            } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/save@v4
-        id: cache
+      - uses: actions/upload-artifact@v4
         with:
           path: ${{ env.LOCAL_ARTIFACTS_STAGING_PATH }}
-          key: unsigned-${{ env.RUN_ATTEMPT_UID }}
+          name: unsigned-artifacts
+          retention-days: 1 # we'll have an additional copy of these files in 'signed-artifacts'
 
   sign:
     name: 🔒 Sign
