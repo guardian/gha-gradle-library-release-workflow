@@ -63,7 +63,7 @@ runs:
 
         # Set the output variable for the Java version
         cat << EndOfFile >> $GITHUB_OUTPUT
-        library_build_major_java_version=$LIBRARY_BUILD_MAJOR_JAVA_VERSION
+        library-build-major-java-version=$LIBRARY_BUILD_MAJOR_JAVA_VERSION
         EndOfFile
 
     - name: Set up Java
