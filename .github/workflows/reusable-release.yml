@@ -79,7 +79,7 @@ jobs:
     needs: init
     runs-on: ubuntu-latest
     outputs:
-      library_build_major_java_version: ${{ steps.versioning.outputs.library_build_major_java_version }}
+      library-build-major-java-version: ${{ steps.versioning.outputs.library-build-major-java-version }}
     steps:
       - name: Versioning
         id: versioning
@@ -197,11 +197,14 @@ jobs:
         with:
           ref: ${{ needs.push-release-commit.outputs.release-commit-id }}
 
+      - run: |
+          echo "Java version for library build: ${{ needs.versioning.outputs.library-build-major-java-version }}"
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: ${{ needs.versioning.outputs.library_build_major_java_version }}
+          java-version: ${{ needs.versioning.outputs.library-build-major-java-version }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3

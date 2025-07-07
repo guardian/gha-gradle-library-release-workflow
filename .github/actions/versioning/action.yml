@@ -69,7 +69,7 @@ runs:
     - name: Set up Java
       uses: actions/setup-java@v4
       with:
-        java-version: ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}
+        java-version: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
         distribution: 'temurin'
 
     - name: Setup Gradle
@@ -199,7 +199,7 @@ runs:
       run: |
         cat << EndOfFile >> $GITHUB_STEP_SUMMARY
         Release $(git describe --tags --abbrev=0)
-        Library built with Java ${{ steps.establish_java_for_library_build.outputs.library_build_major_java_version }}.
+        Library built with Java ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}.
         EndOfFile
 
     - uses: actions/cache/save@v4
