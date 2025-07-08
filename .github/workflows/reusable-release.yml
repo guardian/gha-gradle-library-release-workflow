@@ -180,102 +180,22 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    env:
-      RELEASE_TAG: ${{ needs.push-release-commit.outputs.release-tag }}
-      RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
-      RELEASE_NOTES_URL: ${{ needs.push-release-commit.outputs.release-notes-url }}
-      GH_REPO: ${{ github.repository }}
     steps:
-
-      - name: Get github app token
-        id: generate-github-app-token
-        uses: actions/create-github-app-token@v2
+      - name: Update GitHub
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@ab/update-to-support-gradle-and-monorepo-configs
         with:
-          app-id: ${{ inputs.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-
-      - name: Clean-up temporary branch that was retaining the now-tagged release commit
-        env:
-          GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
-        run: |
-          gh api --method DELETE /repos/:owner/:repo/git/refs/heads/$TEMPORARY_BRANCH
-
-      - name: Common values
-        run: |
-          GITHUB_ACTIONS_PATH="$GITHUB_REPO_URL/actions"
-          GITHUB_WORKFLOW_FILE="release.yml" # Could be derived from $GITHUB_WORKFLOW_REF
-          GITHUB_WORKFLOW_URL="$GITHUB_ACTIONS_PATH/workflows/$GITHUB_WORKFLOW_FILE"
-          
-          cat << EndOfFile >> $GITHUB_ENV
-          GITHUB_WORKFLOW_FILE=$GITHUB_WORKFLOW_FILE
-          GITHUB_WORKFLOW_LINK=[GitHub UI]($GITHUB_WORKFLOW_URL)
-          GITHUB_WORKFLOW_RUN_LINK=[#${{ github.run_number }}]($GITHUB_ACTIONS_PATH/runs/${{ github.run_id }})
-          EndOfFile
-
-      - name: Create Github Release and update version.txt post-release
-        if: needs.init.outputs.release-type == 'FULL_MAIN_BRANCH'
-        env:
-          GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
-        run: |
-          # Create a release with the tag and previous commits
-          gh release create $RELEASE_TAG --verify-tag --generate-notes --notes "Release run: $GITHUB_WORKFLOW_RUN_LINK"
-          echo "GitHub Release notes: [$RELEASE_TAG]($RELEASE_NOTES_URL)" >> $GITHUB_STEP_SUMMARY
-
-          # # Commit API files for each module
-          # API_FILES_JSON='${{ needs.push-release-commit.outputs.api-files }}'
-          # echo "$API_FILES_JSON" | jq -c '.[]' | while read -r api_file; do
-          #   MOD=$(echo "$api_file" | jq -r '.module')
-          #   API_FILE_PATH=$(echo "$api_file" | jq -r '.api_file_path')
-          #   API_FILE_RELEASE_SHA=$(echo "$api_file" | jq -r '.api_file_release_sha')
-          #   API_FILE_POST_RELEASE_CONTENT=$(echo "$api_file" | jq -r '.api_file_post_release_content')
-          #   gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
-          #     --field message="Update public API file for $MOD for $RELEASE_TAG" \
-          #     --field sha="$API_FILE_RELEASE_SHA" \
-          #     --field content="$API_FILE_POST_RELEASE_CONTENT"
-          # done
-          
-          # # Then commit the version file
-          # cat << EndOfFile > commit-message.txt
-          # Post-release of $RELEASE_TAG by @${{github.actor}}: set version
-          # 
-          # Setting snapshot version after @${{github.actor}} published $RELEASE_NOTES_URL
-          # EndOfFile
-          # 
-          # gh api --method PUT /repos/:owner/:repo/contents/${{ needs.push-release-commit.outputs.version_file_path }} \
-          #   --field message="@commit-message.txt" \
-          #   --field sha="${{ needs.push-release-commit.outputs.version_file_release_sha }}" \
-          #   --field content="${{ needs.push-release-commit.outputs.version_file_post_release_content }}"
-          
-      - name: Update PR with comment
-        if: needs.init.outputs.release-type == 'PREVIEW_FEATURE_BRANCH'
-        env:
-          GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
-        run: |
-          cat << EndOfFile > comment_body.txt
-          @${{github.actor}} has published a preview version of this PR with release workflow run $GITHUB_WORKFLOW_RUN_LINK, based on commit ${{ github.sha }}:
-          
-          $RELEASE_VERSION
-          
-          <details>
-          <summary>Want to make another preview release?</summary>
-          
-          Click 'Run workflow' in the $GITHUB_WORKFLOW_LINK, specifying the $GITHUB_REF_NAME branch, or use the [GitHub CLI](https://cli.github.com/) command:
-          
-          gh workflow run $GITHUB_WORKFLOW_FILE --ref $GITHUB_REF_NAME
-          
-          </details>
-          
-          <details>
-          <summary>Want to make a full release after this PR is merged?</summary>
-          
-          Click 'Run workflow' in the $GITHUB_WORKFLOW_LINK, leaving the branch as the default, or use the [GitHub CLI](https://cli.github.com/) command:
-          
-          gh workflow run $GITHUB_WORKFLOW_FILE
-          
-          </details>
-          EndOfFile
-          
-          cat comment_body.txt
-
-          gh pr comment ${{ github.ref_name }} --body-file comment_body.txt >> $GITHUB_STEP_SUMMARY
-
+          GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
+          RELEASE_TAG: ${{ needs.push-release-commit.outputs.release-tag }}
+          RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
+          RELEASE_NOTES_URL: ${{ needs.push-release-commit.outputs.release-notes-url }}
+          TEMPORARY_BRANCH: ${{ env.TEMPORARY_BRANCH }}
+          GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          API_FILES: ${{ needs.push-release-commit.outputs.api-files }}
+          VERSION_FILE_PATH: ${{ needs.push-release-commit.outputs.version-file-path }}
+          VERSION_FILE_RELEASE_SHA: ${{ needs.push-release-commit.outputs.version-file-release-sha }}
+          VERSION_FILE_POST_RELEASE_CONTENT: ${{ needs.push-release-commit.outputs.version-file-post-release-content }}
