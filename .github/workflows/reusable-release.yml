@@ -334,7 +334,7 @@ jobs:
           EndOfFile
 
       - name: Create Github Release and update version.txt post-release
-        if: needs.init.outputs.release_type == 'FULL_MAIN_BRANCH'
+        if: needs.init.outputs.release-type == 'FULL_MAIN_BRANCH'
         env:
           GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
         run: |
@@ -368,7 +368,7 @@ jobs:
             --field content="${{ needs.push-release-commit.outputs.version_file_post_release_content }}"
 
       - name: Update PR with comment
-        if: needs.init.outputs.release_type == 'PREVIEW_FEATURE_BRANCH'
+        if: needs.init.outputs.release-type == 'PREVIEW_FEATURE_BRANCH'
         env:
           GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
         run: |
