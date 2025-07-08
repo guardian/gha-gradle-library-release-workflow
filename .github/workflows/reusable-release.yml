@@ -134,70 +134,17 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
     outputs:
-      artifact-sha256sums: ${{ steps.record-hashes.outputs.artifact-sha256sums }}
+      artifact-sha256sums: ${{ steps.create-artifacts.outputs.artifact-sha256sums }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Create Artifacts
+        id: create-artifacts
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@ab/update-to-support-gradle-and-monorepo-configs
         with:
-          ref: ${{ needs.push-release-commit.outputs.release-commit-id }}
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: corretto
-          java-version: ${{ needs.versioning.outputs.library-build-major-java-version }}
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: wrapper
-
-      - name: Generate artifacts
-        run: |
-          SOURCE_DIR="${{ inputs.SOURCE_DIR }}"
-          if [ -n "$SOURCE_DIR" ]; then
-            if [ ! -d "$SOURCE_DIR" ]; then
-              echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
-              exit 1
-            fi
-            cd "$SOURCE_DIR"
-          fi
-          
-          # Update version.txt with the release version
-          echo $RELEASE_VERSION > ${{ inputs.VERSION_FILE }}
-          
-          cat ${{ inputs.VERSION_FILE }}
-          
-          MODULES="${{ inputs.MODULES }}"
-          if [ -n "$MODULES" ]; then
-            IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
-
-            for mod in "${MOD_ARRAY[@]}"; do
-              MOD=$(echo "${mod}" | xargs)
-              ./gradlew ":${MOD}:publishReleasePublicationToCustomRepository" -Prepo.local=$LOCAL_ARTIFACTS_STAGING_PATH
-            done
-          fi
-          
-          # Delete maven-metadata.xml files to avoid publishing them
-          find $LOCAL_ARTIFACTS_STAGING_PATH -type f -name 'maven-metadata.xml*' -delete
-
-      - name: Record SHA-256 hashes of artifacts
-        id: record-hashes
-        run: |
-          sudo apt-get install hashdeep -q > /dev/null
-
-           cd $LOCAL_ARTIFACTS_STAGING_PATH
-           {
-             echo 'artifact-sha256sums<<EOF'
-             sha256deep -r -l .
-             echo EOF
-           } >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          path: ${{ env.LOCAL_ARTIFACTS_STAGING_PATH }}
-          name: unsigned-artifacts
-          retention-days: 1 # we'll have an additional copy of these files in 'signed-artifacts'
+          SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
+          MODULES: ${{ inputs.MODULES }}
+          VERSION_FILE: ${{ inputs.VERSION_FILE }}
+          LOCAL_ARTIFACTS_STAGING_PATH: ${{ env.LOCAL_ARTIFACTS_STAGING_PATH }}
+          RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
 
   sign:
     name: 🔒 Sign
