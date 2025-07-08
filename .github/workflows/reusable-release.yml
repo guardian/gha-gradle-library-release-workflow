@@ -94,12 +94,6 @@ jobs:
 
   push-release-commit:
     name: 🔒 Push Release Commit
-    # This job may become unusual for this workflow, in that it could be separated into several trusted action calls:
-    # * 'extract versioning metadata', a **platform-specific** (sbt/gradle) step which:
-    #   - verifies that only *approved* files (eg version.sbt) have been modified, and ideally constrains the modifications
-    #   - parses and outputs the version number
-    # * 'push verified release commit' - a generic action which pushes the verified content of the release commit to
-    #   GitHub, using the GitHub API, which means the release commit is authored & signed by our GitHub App
     needs: [versioning, init]
     permissions:
       contents: write
@@ -116,11 +110,6 @@ jobs:
       api-files: ${{ steps.create-commit.outputs.api-files }}
 
     steps:
-      # - id: act
-      #   uses: guardian/gha-scala-library-release-workflow/actions/push-release-commit@main
-      #   with:
-      #     github-app-id: ${{ inputs.GITHUB_APP_ID }}
-      #     github-app-private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
       - name: Generate app token
         id: generate-github-app-token
         uses: actions/create-github-app-token@v2
@@ -185,13 +174,6 @@ jobs:
     outputs:
       artifact-sha256sums: ${{ steps.record-hashes.outputs.artifact-sha256sums }}
     steps:
-      # - id: act
-      #   uses: guardian/gha-scala-library-release-workflow/actions/create-artifacts@main
-      #   with:
-      #     release-commit-id: ${{ needs.push-release-commit.outputs.release-commit-id }}
-      #     release-notes-url: ${{ needs.push-release-commit.outputs.release-notes-url }}
-      #     library-build-major-java-version: ${{ needs.versioning.outputs.library-build-major-java-version }}
-      #     owner-email: ${{ needs.init.outputs.pgp-key-email }}
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -295,18 +277,6 @@ jobs:
       RELEASE_NOTES_URL: ${{ needs.push-release-commit.outputs.release-notes-url }}
       GH_REPO: ${{ github.repository }}
     steps:
-      # - uses: guardian/gha-scala-library-release-workflow/actions/update-github@main
-      #   with:
-      #     release-type: ${{ needs.init.outputs.release-type }}
-      #     release-tag: ${{ needs.push-release-commit.outputs.release-tag }}
-      #     release-version: ${{ needs.push-release-commit.outputs.release-version }}
-      #     release-notes-url: ${{ needs.push-release-commit.outputs.release-notes_url }}
-      #     temporary-branch: ${{ needs.push-release-commit.outputs.temporary-branch }}
-      #     github-app-id: ${{ inputs.GITHUB_APP_ID }}
-      #     github-app-private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-      #     version-file-path: ${{ needs.push-release-commit.outputs.version-file-path }}
-      #     version-file-post-release-content: ${{ needs.push-release-commit.outputs.version-file-post-release-content }}
-      #     version-file-release-sha: ${{ needs.push-release-commit.outputs.version-file-release-sha }}
 
       - name: Get github app token
         id: generate-github-app-token
@@ -338,35 +308,35 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
         run: |
+          # Create a release with the tag and previous commits
           gh release create $RELEASE_TAG --verify-tag --generate-notes --notes "Release run: $GITHUB_WORKFLOW_RUN_LINK"
           echo "GitHub Release notes: [$RELEASE_TAG]($RELEASE_NOTES_URL)" >> $GITHUB_STEP_SUMMARY
-          
-          # Commit API files for each module
-          API_FILES_JSON='${{ needs.push-release-commit.outputs.api-files }}'
-          echo "$API_FILES_JSON" | jq -c '.[]' | while read -r api_file; do
-            MOD=$(echo "$api_file" | jq -r '.module')
-            API_FILE_PATH=$(echo "$api_file" | jq -r '.api_file_path')
-            API_FILE_RELEASE_SHA=$(echo "$api_file" | jq -r '.api_file_release_sha')
-            API_FILE_POST_RELEASE_CONTENT=$(echo "$api_file" | jq -r '.api_file_post_release_content')
-            gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
-              --field message="Update public API file for $MOD for $RELEASE_TAG" \
-              --field sha="$API_FILE_RELEASE_SHA" \
-              --field content="$API_FILE_POST_RELEASE_CONTENT"
-          done
-          
-          
-          # Then commit the version file
-          cat << EndOfFile > commit-message.txt
-          Post-release of $RELEASE_TAG by @${{github.actor}}: set version
-          
-          Setting snapshot version after @${{github.actor}} published $RELEASE_NOTES_URL
-          EndOfFile
-          
-          gh api --method PUT /repos/:owner/:repo/contents/${{ needs.push-release-commit.outputs.version_file_path }} \
-            --field message="@commit-message.txt" \
-            --field sha="${{ needs.push-release-commit.outputs.version_file_release_sha }}" \
-            --field content="${{ needs.push-release-commit.outputs.version_file_post_release_content }}"
 
+          # # Commit API files for each module
+          # API_FILES_JSON='${{ needs.push-release-commit.outputs.api-files }}'
+          # echo "$API_FILES_JSON" | jq -c '.[]' | while read -r api_file; do
+          #   MOD=$(echo "$api_file" | jq -r '.module')
+          #   API_FILE_PATH=$(echo "$api_file" | jq -r '.api_file_path')
+          #   API_FILE_RELEASE_SHA=$(echo "$api_file" | jq -r '.api_file_release_sha')
+          #   API_FILE_POST_RELEASE_CONTENT=$(echo "$api_file" | jq -r '.api_file_post_release_content')
+          #   gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
+          #     --field message="Update public API file for $MOD for $RELEASE_TAG" \
+          #     --field sha="$API_FILE_RELEASE_SHA" \
+          #     --field content="$API_FILE_POST_RELEASE_CONTENT"
+          # done
+          
+          # # Then commit the version file
+          # cat << EndOfFile > commit-message.txt
+          # Post-release of $RELEASE_TAG by @${{github.actor}}: set version
+          # 
+          # Setting snapshot version after @${{github.actor}} published $RELEASE_NOTES_URL
+          # EndOfFile
+          # 
+          # gh api --method PUT /repos/:owner/:repo/contents/${{ needs.push-release-commit.outputs.version_file_path }} \
+          #   --field message="@commit-message.txt" \
+          #   --field sha="${{ needs.push-release-commit.outputs.version_file_release_sha }}" \
+          #   --field content="${{ needs.push-release-commit.outputs.version_file_post_release_content }}"
+          
       - name: Update PR with comment
         if: needs.init.outputs.release-type == 'PREVIEW_FEATURE_BRANCH'
         env:
