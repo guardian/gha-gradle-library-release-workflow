@@ -99,58 +99,22 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     outputs:
-      release-tag: ${{ steps.create-commit.outputs.release-tag }}
-      release-notes-url: ${{ steps.create-commit.outputs.release-notes-url }}
-      release-version: ${{ steps.create-commit.outputs.release-version }}
-      release-commit-id: ${{ steps.create-commit.outputs.release-commit-id }}
-      version-file-path: ${{ steps.create-commit.outputs.version-file-path }}
-      version-file-release-sha: ${{ steps.create-commit.outputs.version-file-release-sha }}
-      version-file-post-release-content: ${{ steps.create-commit.outputs.version-file-post-release-content }}
-      temporary-branch: ${{ steps.create-commit.outputs.temporary-branch }}
-      api-files: ${{ steps.create-commit.outputs.api-files }}
-
+      release-tag: ${{ steps.push-release-commit.outputs.release-tag }}
+      release-notes-url: ${{ steps.push-release-commit.outputs.release-notes-url }}
+      release-version: ${{ steps.push-release-commit.outputs.release-version }}
+      release-commit-id: ${{ steps.push-release-commit.outputs.release-commit-id }}
+      version-file-path: ${{ steps.push-release-commit.outputs.version-file-path }}
+      version-file-release-sha: ${{ steps.push-release-commit.outputs.version-file-release-sha }}
+      version-file-post-release-content: ${{ steps.push-release-commit.outputs.version-file-post-release-content }}
+      temporary-branch: ${{ steps.push-release-commit.outputs.temporary-branch }}
+      api-files: ${{ steps.push-release-commit.outputs.api-files }}
     steps:
-      - name: Generate app token
-        id: generate-github-app-token
-        uses: actions/create-github-app-token@v2
+      - name: Push Release Commit
+        id: push-release-commit
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@ab/update-to-support-gradle-and-monorepo-configs
         with:
-          app-id: ${{ inputs.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          path: repo
-
-      - name: Restore cache with unsigned version update commits
-        uses: actions/cache/restore@v4
-        with:
-          path: repo-with-unsigned-version-update-commits.git
-          key: repo-with-unsigned-version-update-commits-${{ env.RUN_ATTEMPT_UID }}
-          fail-on-cache-miss: true
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: corretto
-          java-version: 17
-          gpg-private-key: ${{ secrets.PGP_PRIVATE_KEY }}
-
-      - name: Checkout release workflow repository for scripts
-        uses: actions/checkout@v4
-        with:
-          repository: guardian/gha-gradle-library-release-workflow
-          path: gha-gradle-library-release-workflow
-          ref: 'ab/update-to-support-gradle-and-monorepo-configs'
-          sparse-checkout: '.github/scripts'
-
-      - name: Create commit
-        id: create-commit
-        env:
-          KEY_FINGERPRINT: ${{ needs.init.outputs.pgp-key-fingerprint }}
-          KEY_EMAIL: ${{ needs.init.outputs.pgp-key-email }}
-          GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
-          GH_REPO: ${{ github.repository }}
+          GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
           API_FILE: ${{ inputs.API_FILE }}
@@ -162,8 +126,6 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_RUN_ID: ${{ github.run_id }}
-        run: |
-          bash gha-gradle-library-release-workflow/.github/scripts/create-unsigned-commit.sh
 
   create-artifacts:
     name: 🎊 Create artifacts
