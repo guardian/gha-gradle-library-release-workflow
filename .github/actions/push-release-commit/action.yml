@@ -204,8 +204,6 @@ runs:
         # Remove trailing comma and close JSON array
         API_FILES_JSON="${API_FILES_JSON%,}]"
 
-#        cd "$BASE_PATH"
-        
         echo "Creating commit message file"
         cat << EndOfFile > commit-message.txt
         $RELEASE_TAG published by $GITHUB_ACTOR
@@ -218,6 +216,7 @@ runs:
         Release-Workflow-Run: $GITHUB_REPO_URL/actions/runs/$GITHUB_RUN_ID
         Release-Notes: $RELEASE_NOTES_URL
         EndOfFile
+        
         echo "Commit message file created successfully..."
         cat commit-message.txt
 
