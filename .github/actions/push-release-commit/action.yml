@@ -121,6 +121,8 @@ runs:
 
         cd repo-with-unsigned-version-update-commits.git
         RELEASE_TAG=$(git describe --tags --abbrev=0)
+        
+        echo "RELEASE_TAG=$RELEASE_TAG"
 
         INCOMING_REPO_PATH="$(pwd)"
 
@@ -132,8 +134,10 @@ runs:
             exit 1
           fi
           cd "$SOURCE_DIR"
+          echo "Changed directory to $SOURCE_DIR"
         fi
 
+        echo "Adding remote and fetching for INCOMING_REPO_PATH: $INCOMING_REPO_PATH"
         git remote add unsigned "$INCOMING_REPO_PATH"
         git fetch unsigned
 
@@ -145,15 +149,22 @@ runs:
           # Use the PR url as the release notes url when doing a 'preview' release
           RELEASE_NOTES_URL=$( gh pr view "$GITHUB_REF_NAME" --json url -q .url )
         fi
-
+        echo "RELEASE_NOTES_URL=$RELEASE_NOTES_URL"
+        
         VERSION_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "$VERSION_FILE")
+        echo "VERSION_FILE_PATH=$VERSION_FILE_PATH"
         VERSION_FILE_INITIAL_SHA=$( git rev-parse "$GITHUB_REF":"$VERSION_FILE_PATH" )
+        echo "VERSION_FILE_INITIAL_SHA=$VERSION_FILE_INITIAL_SHA"
         VERSION_FILE_RELEASE_SHA=$( git rev-parse "$RELEASE_TAG":"$VERSION_FILE_PATH" )
+        echo "VERSION_FILE_RELEASE_SHA=$VERSION_FILE_RELEASE_SHA"
         VERSION_FILE_RELEASE_CONTENT=$( git cat-file blob "$RELEASE_TAG":"$VERSION_FILE_PATH" | base64 -w0)
+        echo "VERSION_FILE_RELEASE_CONTENT=$VERSION_FILE_RELEASE_CONTENT"
         VERSION_FILE_POST_RELEASE_CONTENT=$( git cat-file blob unsigned/"$GITHUB_REF_NAME":"$VERSION_FILE_PATH" | base64 -w0)
+        echo "VERSION_FILE_POST_RELEASE_CONTENT=$VERSION_FILE_POST_RELEASE_CONTENT"
 
         # Create temporary branch to push the release commit- required for PREVIEW releases
         gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
+        echo "Temporary branch created: $TEMPORARY_BRANCH with sha $GITHUB_SHA"
 
         # Parse modules and iterate over them, committing API files and collecting their details
         # in a json object for later use
@@ -164,10 +175,15 @@ runs:
         for mod in "${MOD_ARRAY[@]}"; do
           MOD=$(echo "${mod}" | xargs)
           API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "${MOD}/${API_FILE}")
+          echo "API_FILE_PATH for module $MOD: $API_FILE_PATH"
           API_FILE_INITIAL_SHA=$(git rev-parse "$GITHUB_REF":"$API_FILE_PATH")
+          echo "API_FILE_INITIAL_SHA for module $MOD: $API_FILE_INITIAL_SHA"
           API_FILE_RELEASE_SHA=$(git rev-parse "$RELEASE_TAG":"$API_FILE_PATH")
+          echo "API_FILE_RELEASE_SHA for module $MOD: $API_FILE_RELEASE_SHA"
           API_FILE_RELEASE_CONTENT=$(git cat-file blob "$RELEASE_TAG":"$API_FILE_PATH" | base64 -w0)
+          echo "API_FILE_RELEASE_CONTENT for module $MOD: $API_FILE_RELEASE_CONTENT"
           API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/"$GITHUB_REF_NAME":"$API_FILE_PATH" | base64 -w0)
+          echo "API_FILE_POST_RELEASE_CONTENT for module $MOD: $API_FILE_POST_RELEASE_CONTENT"
 
           # Commit the API file changes for module
           gh api --method PUT /repos/:owner/:repo/contents/"$API_FILE_PATH" \
@@ -175,6 +191,8 @@ runs:
             --field message="Update public API file for module $MOD for $RELEASE_TAG" \
             --field sha="$API_FILE_INITIAL_SHA" \
             --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha'
+          
+          echo "API file for module $MOD committed successfully."
 
           API_FILES_JSON="${API_FILES_JSON}{\"module\":\"$MOD\",\"api_file_path\":\"$API_FILE_PATH\",\"api_file_release_sha\":\"$API_FILE_RELEASE_SHA\",\"api_file_post_release_content\":\"$API_FILE_POST_RELEASE_CONTENT\"},"
         done
@@ -202,6 +220,7 @@ runs:
           --field message="@commit-message.txt" \
           --field sha="$VERSION_FILE_INITIAL_SHA" \
           --field content="$VERSION_FILE_RELEASE_CONTENT" --jq '.commit.sha')
+        echo "Version file committed successfully with commit ID: $version_commit_id"
 
         # Set output
         cat << EndOfFile >> "$GITHUB_OUTPUT"
