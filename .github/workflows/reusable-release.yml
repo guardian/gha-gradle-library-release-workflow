@@ -133,6 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
+      LIBRARY_BUILD_MAJOR_JAVA_VERSION: ${{ needs.versioning.outputs.library-build-major-java-version }}
     outputs:
       artifact-sha256sums: ${{ steps.create-artifacts.outputs.artifact-sha256sums }}
     steps:
