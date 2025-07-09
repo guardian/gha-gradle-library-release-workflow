@@ -65,11 +65,14 @@ runs:
         GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
       shell: bash
       run: |
+        echo "Cleaning up temporary branch: '${{ inputs.TEMPORARY_BRANCH }}'"
         gh api --method DELETE /repos/:owner/:repo/git/refs/heads/${{ inputs.TEMPORARY_BRANCH }}
+        echo "Temporary branch '${{ inputs.TEMPORARY_BRANCH }}' cleaned up."
 
     - name: Common values
       shell: bash
       run: |
+        echo "Setting common values for the workflow"
         GITHUB_ACTIONS_PATH="${{ inputs.GITHUB_REPO_URL }}/actions"
         GITHUB_WORKFLOW_FILE="release.yml"
         GITHUB_WORKFLOW_URL="$GITHUB_ACTIONS_PATH/workflows/$GITHUB_WORKFLOW_FILE"
@@ -78,6 +81,10 @@ runs:
         GITHUB_WORKFLOW_LINK=[GitHub UI]($GITHUB_WORKFLOW_URL)
         GITHUB_WORKFLOW_RUN_LINK=[#${{ inputs.GITHUB_RUN_ID }}]($GITHUB_ACTIONS_PATH/runs/${{ inputs.GITHUB_RUN_ID }})
         EndOfFile
+        echo "Set environment variables for GitHub workflow file and links:"
+        echo "GITHUB_WORKFLOW_FILE: $GITHUB_WORKFLOW_FILE"
+        echo "GITHUB_WORKFLOW_LINK: $GITHUB_WORKFLOW_LINK"
+        echo "GITHUB_WORKFLOW_RUN_LINK: $GITHUB_WORKFLOW_RUN_LINK"
 
     - name: Create Github Release and update version.txt post-release
       if: ${{ inputs.RELEASE_TYPE == 'FULL_MAIN_BRANCH' }}
@@ -133,6 +140,7 @@ runs:
         GITHUB_REF_NAME: ${{ github.ref_name }}
       shell: bash
       run: |
+        echo "Updating PR with comment for preview release"
         cat << EndOfFile > comment_body.txt
         @${GITHUB_ACTOR} has published a preview version of this PR with release workflow run $GITHUB_WORKFLOW_RUN_LINK, based on commit ${{ github.sha }}:
 
