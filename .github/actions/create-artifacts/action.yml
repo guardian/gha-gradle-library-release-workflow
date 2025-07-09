@@ -19,6 +19,9 @@ inputs:
   RELEASE_VERSION:
     description: 'Release version to write to version file.'
     required: true
+  RELEASE_COMMIT_ID:
+    description: "The git commit-id SHA for the actual release commit"
+    required: true
 outputs:
   artifact-sha256sums:
     description: "SHA-256 hashes of artifacts"
@@ -29,7 +32,7 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        ref: ${{ inputs.RELEASE_VERSION }}
+        ref: ${{ inputs.RELEASE_COMMIT_ID }}
 
     - name: Set up Java
       uses: actions/setup-java@v4
