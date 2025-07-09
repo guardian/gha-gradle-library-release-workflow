@@ -120,6 +120,9 @@ runs:
         BASE_PATH=$(pwd)
 
         cd repo-with-unsigned-version-update-commits.git
+        pwd
+        ls -al
+        echo "Getting release tag from git"
         RELEASE_TAG=$(git describe --tags --abbrev=0)
         
         echo "RELEASE_TAG=$RELEASE_TAG"
