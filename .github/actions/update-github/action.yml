@@ -63,10 +63,12 @@ runs:
     - name: Clean-up temporary branch that was retaining the now-tagged release commit
       env:
         GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
+      shell: bash
       run: |
         gh api --method DELETE /repos/:owner/:repo/git/refs/heads/${{ inputs.TEMPORARY_BRANCH }}
 
     - name: Common values
+      shell: bash
       run: |
         GITHUB_ACTIONS_PATH="${{ inputs.GITHUB_REPO_URL }}/actions"
         GITHUB_WORKFLOW_FILE="release.yml"
@@ -89,6 +91,7 @@ runs:
         VERSION_FILE_RELEASE_SHA: ${{ inputs.VERSION_FILE_RELEASE_SHA }}
         VERSION_FILE_POST_RELEASE_CONTENT: ${{ inputs.VERSION_FILE_POST_RELEASE_CONTENT }}
         GITHUB_ACTOR: ${{ inputs.GITHUB_ACTOR }}
+      shell: bash
       run: |
         gh release create $RELEASE_TAG --verify-tag --generate-notes --notes "Release run: $GITHUB_WORKFLOW_RUN_LINK"
         echo "GitHub Release notes: [$RELEASE_TAG]($RELEASE_NOTES_URL)" >> $GITHUB_STEP_SUMMARY
@@ -128,6 +131,7 @@ runs:
         GITHUB_WORKFLOW_FILE: ${{ env.GITHUB_WORKFLOW_FILE }}
         GITHUB_WORKFLOW_RUN_LINK: ${{ env.GITHUB_WORKFLOW_RUN_LINK }}
         GITHUB_REF_NAME: ${{ github.ref_name }}
+      shell: bash
       run: |
         cat << EndOfFile > comment_body.txt
         @${GITHUB_ACTOR} has published a preview version of this PR with release workflow run $GITHUB_WORKFLOW_RUN_LINK, based on commit ${{ github.sha }}:
