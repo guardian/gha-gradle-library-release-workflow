@@ -65,7 +65,7 @@ runs:
         GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
       shell: bash
       run: |
-        echo "Cleaning up temporary branch: '${{ inputs.TEMPORARY_BRANCH }}'"
+        echo "Cleaning up temporary branch: '/repos/:owner/:repo/git/refs/heads/${{ inputs.TEMPORARY_BRANCH }}'"
         gh api --method DELETE /repos/:owner/:repo/git/refs/heads/${{ inputs.TEMPORARY_BRANCH }}
         echo "Temporary branch '${{ inputs.TEMPORARY_BRANCH }}' cleaned up."
 
