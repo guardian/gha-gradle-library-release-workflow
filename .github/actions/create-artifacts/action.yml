@@ -1,0 +1,99 @@
+name: "Create Artifacts"
+description: "Composite action for building and staging unsigned artifacts"
+
+inputs:
+  SOURCE_DIR:
+    description: 'Path to source directory.'
+    required: false
+    default: ''
+  MODULES:
+    description: 'Comma-separated list of module names to build.'
+    required: true
+  VERSION_FILE:
+    description: 'Path to version file relative to the source directory.'
+    required: false
+    default: 'version.txt'
+  LOCAL_ARTIFACTS_STAGING_PATH:
+    description: 'Path to stage artifacts.'
+    required: false
+    default: '/tmp/artifact_staging'
+  RELEASE_VERSION:
+    description: 'Release version to write to version file.'
+    required: true
+  RELEASE_COMMIT_ID:
+    description: "The git commit-id SHA for the actual release commit"
+    required: true
+
+outputs:
+  artifact-sha256sums:
+    description: "SHA-256 hashes of artifacts"
+    value: ${{ steps.record-hashes.outputs.artifact-sha256sums }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.RELEASE_COMMIT_ID }}
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: corretto
+        java-version: ${{ env.LIBRARY_BUILD_MAJOR_JAVA_VERSION }}
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: wrapper
+
+    - name: Generate artifacts
+      shell: bash
+      run: |
+        SOURCE_DIR="${{ inputs.SOURCE_DIR }}"
+        if [ -n "$SOURCE_DIR" ]; then
+          if [ ! -d "$SOURCE_DIR" ]; then
+            echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
+            exit 1
+          fi
+          cd "$SOURCE_DIR"
+        fi
+
+        # Update version.txt with the release version
+        echo ${{ inputs.RELEASE_VERSION }} > ${{ inputs.VERSION_FILE }}
+
+        cat ${{ inputs.VERSION_FILE }}
+
+        MODULES="${{ inputs.MODULES }}"
+        if [ -n "$MODULES" ]; then
+          IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
+
+          for mod in "${MOD_ARRAY[@]}"; do
+            MOD=$(echo "${mod}" | xargs)
+            ./gradlew ":${MOD}:publishReleasePublicationToCustomRepository" -Prepo.local=${{ inputs.LOCAL_ARTIFACTS_STAGING_PATH }}
+          done
+        fi
+
+        # Delete maven-metadata.xml files to avoid publishing them
+        find ${{ inputs.LOCAL_ARTIFACTS_STAGING_PATH }} -type f -name 'maven-metadata.xml*' -delete
+
+    - name: Record SHA-256 hashes of artifacts
+      id: record-hashes
+      shell: bash
+      run: |
+        sudo apt-get install hashdeep -q > /dev/null
+
+        cd ${{ inputs.LOCAL_ARTIFACTS_STAGING_PATH }}
+        {
+          echo 'artifact-sha256sums<<EOF'
+          sha256deep -r -l .
+          echo EOF
+        } >> "$GITHUB_OUTPUT"
+
+    - uses: actions/upload-artifact@v4
+      with:
+        path: ${{ inputs.LOCAL_ARTIFACTS_STAGING_PATH }}
+        name: unsigned-artifacts
+        retention-days: 1
+

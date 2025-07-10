@@ -1,0 +1,208 @@
+name: "Versioning"
+description: "Composite action for library versioning"
+
+inputs:
+  SOURCE_DIR:
+    description: 'Path to source directory.'
+    required: false
+    default: ''
+  MODULES:
+    description: 'Comma-separated list of module names to build.'
+    required: true
+  API_FILE:
+    description: 'Path to API file relative to the module directory.'
+    required: false
+    default: 'api/api.txt'
+  VERSION_FILE:
+    description: 'Path to version file relative to the source directory.'
+    required: false
+    default: 'version.txt'
+  VERSION_SUFFIX:
+    description: 'Suffix to append to the version.'
+    required: false
+    default: ''
+
+outputs:
+  library-build-major-java-version:
+    description: "The major version of Java (eg '21', '17', or '11') the library should be built with"
+    value: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Establish library build Java version
+      id: establish_java_for_library_build
+      shell: bash
+      run: |
+        SOURCE_DIR="${{ inputs.SOURCE_DIR }}"
+        if [ -n "$SOURCE_DIR" ]; then
+          if [ ! -d "$SOURCE_DIR" ]; then
+            echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
+            exit 1
+          fi
+          cd "$SOURCE_DIR"
+        fi
+
+        # Check if .tool-versions file exists
+        if [ ! -f .tool-versions ]; then
+          echo "::error title=Missing .tool-versions file::gha-gradle-library-release-workflow requires an asdf-format .tool-versions file to establish the Java version for the build."
+          exit 1
+        fi
+
+        # Check if the file contains a Java version
+        LIBRARY_BUILD_MAJOR_JAVA_VERSION=$( grep -Eo 'java [[:alnum:]-]+-[[:digit:]]+' .tool-versions | rev | cut -d'-' -f1 | rev )
+        echo "Using Java $LIBRARY_BUILD_MAJOR_JAVA_VERSION"
+        if [ -z "${LIBRARY_BUILD_MAJOR_JAVA_VERSION}" ]; then
+          echo "::error title=Missing Java version in .tool-versions file::Could not establish the library's required Java version - the '.tool-versions' file should have a line like 'java corretto-21.0.3.9.1'."
+          exit 1
+        fi
+
+        # Set the output variable for the Java version
+        cat << EndOfFile >> $GITHUB_OUTPUT
+        library-build-major-java-version=$LIBRARY_BUILD_MAJOR_JAVA_VERSION
+        EndOfFile
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: wrapper
+
+    - name: Update version and API files
+      env:
+        SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
+        VERSION_FILE: ${{ inputs.VERSION_FILE }}
+        API_FILE: ${{ inputs.API_FILE }}
+        MODULES: ${{ inputs.MODULES }}
+        VERSION_SUFFIX: ${{ inputs.VERSION_SUFFIX }}
+      shell: bash
+      run: |
+        set -e
+
+        git config user.email "example@example.com"
+        git config user.name "Ephemeral commit created only for extracting version commit information"
+
+        # Check and switch to source directory if provided and exists
+        if [ -n "$SOURCE_DIR" ]; then
+          if [ ! -d "$SOURCE_DIR" ]; then
+            echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
+            exit 1
+          fi
+          cd "$SOURCE_DIR"
+        fi
+
+        # If the version file does not exist, create it with a default version
+        if [ ! -f "$VERSION_FILE" ]; then
+          echo "0.0.1" > "$VERSION_FILE"
+        fi
+
+        # Read major, minor, and patch version from the version file
+        VERSION=$(cat "$VERSION_FILE" | tr -d ' \n\r')
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+        # Validate version format
+        if ! [[ "$MAJOR" =~ ^[0-9]+$ && "$MINOR" =~ ^[0-9]+$ && "$PATCH" =~ ^[0-9]+$ ]]; then
+          echo "::error title=Invalid version format::Version file '$VERSION_FILE' must contain a valid semantic version (e.g., 1.0.0)."
+          exit 1
+        fi
+
+        # Iterate over modules and determine the highest version bump required
+        IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
+
+        HIGHEST_BUMP="patch"
+
+        for mod in "${MOD_ARRAY[@]}"; do
+          MOD=$(echo "${mod}" | xargs)
+          MOD_API_FILE="${MOD}/${API_FILE}"
+
+          TMP_API_FILE=$(mktemp)
+          cp "$MOD_API_FILE" "$TMP_API_FILE"
+
+          # Check API compatibility
+          set +e
+          ./gradlew ":${MOD}:metalavaCheckCompatibilityRelease"
+          RESULT=$?
+          set -e
+
+          if [ $RESULT -ne 0 ]; then
+            ./gradlew ":${MOD}:metalavaGenerateSignatureRelease"
+            BUMP="major"
+          else
+            ./gradlew ":${MOD}:metalavaGenerateSignatureRelease"
+            if ! cmp -s "$MOD_API_FILE" "$TMP_API_FILE"; then
+              BUMP="minor"
+            else
+              BUMP="patch"
+            fi
+          fi
+
+          # Determine the highest bump needed
+          if [ "$BUMP" = "major" ]; then
+            HIGHEST_BUMP="major"
+          elif [ "$BUMP" = "minor" ] && [ "$HIGHEST_BUMP" = "patch" ]; then
+            HIGHEST_BUMP="minor"
+          fi
+
+          # Add this module's API file to the commit
+          git add "$MOD_API_FILE"
+
+          rm -f "$TMP_API_FILE"
+        done
+
+        # Apply the highest bump
+        if [ "$HIGHEST_BUMP" = "major" ]; then
+          MAJOR=$((MAJOR + 1))
+          MINOR=0
+          PATCH=0
+        elif [ "$HIGHEST_BUMP" = "minor" ]; then
+          MINOR=$((MINOR + 1))
+          PATCH=0
+        else
+          PATCH=$((PATCH + 1))
+        fi
+
+        # Update version file with the new version
+        echo "$MAJOR.$MINOR.$PATCH" > "$VERSION_FILE"
+
+        echo "Updated version to $MAJOR.$MINOR.$PATCH"
+
+        # Commit the updated version
+        git add "$VERSION_FILE"
+        git commit -m "chore: update version to $MAJOR.$MINOR.$PATCH"
+
+        # Add version_suffix to the version and tag the commit with the new version number
+        git tag "v$MAJOR.$MINOR.$PATCH${VERSION_SUFFIX}"
+
+    - name: Create bare repo with unsigned version update commits
+      shell: bash
+      run: |
+        echo $GITHUB_WORKSPACE
+        cd `mktemp -d`
+        git clone --bare $GITHUB_WORKSPACE unverified-version-updates.git
+        tar -cvf unverified-version-updates.git.tar unverified-version-updates.git
+        
+        cat << EndOfFile >> $GITHUB_ENV
+        BARE_REPO_PATH=$(pwd)/unverified-version-updates.git.tar
+        EndOfFile
+
+
+    - name: Job summary
+      shell: bash
+      run: |
+        cat << EndOfFile >> $GITHUB_STEP_SUMMARY
+        # Release $(git describe --tags --abbrev=0)
+        Library built with Java ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}.
+        EndOfFile
+
+    - uses: actions/upload-artifact@v4
+      with:
+        path: ${{ env.BARE_REPO_PATH }}
+        name: unverified-version-updates

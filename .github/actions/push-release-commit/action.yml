@@ -1,0 +1,212 @@
+name: "Push Release Commit"
+description: "Composite action for pushing the release commit"
+inputs:
+  GITHUB_APP_ID:
+    description: "GitHub App ID"
+    required: true
+  GITHUB_APP_PRIVATE_KEY:
+    description: "GitHub App private key"
+    required: true
+  SOURCE_DIR:
+    description: "Path to source directory"
+    required: false
+    default: ""
+  VERSION_FILE:
+    description: "Path to version file"
+    required: false
+    default: "version.txt"
+  API_FILE:
+    description: "Path to API file"
+    required: false
+    default: "api/api.txt"
+  MODULES:
+    description: "Comma-separated list of modules"
+    required: true
+  RELEASE_TYPE:
+    description: "Release type"
+    required: true
+  VERSION_SUFFIX:
+    description: "Version suffix"
+    required: false
+    default: ""
+  GITHUB_REPO_URL:
+    description: "GitHub repo URL"
+    required: true
+  GITHUB_ACTOR:
+    description: "GitHub actor"
+    required: true
+  GITHUB_SERVER_URL:
+    description: "GitHub server URL"
+    required: true
+  GITHUB_RUN_ID:
+    description: "GitHub run ID"
+    required: true
+outputs:
+  release-tag:
+    description: "Release tag"
+    value: ${{ steps.create-commit.outputs.release-tag }}
+  release-notes-url:
+    description: "Release notes URL"
+    value: ${{ steps.create-commit.outputs.release-notes-url }}
+  release-version:
+    description: "Release version"
+    value: ${{ steps.create-commit.outputs.release-version }}
+  release-commit-id:
+    description: "Release commit ID"
+    value: ${{ steps.create-commit.outputs.release-commit-id }}
+  version-file-path:
+    description: "Version file path"
+    value: ${{ steps.create-commit.outputs.version-file-path }}
+  version-file-release-sha:
+    description: "Version file release SHA"
+    value: ${{ steps.create-commit.outputs.version-file-release-sha }}
+  version-file-post-release-content:
+    description: "Version file post-release content"
+    value: ${{ steps.create-commit.outputs.version-file-post-release-content }}
+  temporary-branch:
+    description: "Temporary branch"
+    value: ${{ steps.create-commit.outputs.temporary-branch }}
+  api-files:
+    description: "API files"
+    value: ${{ steps.create-commit.outputs.api-files }}
+runs:
+  using: "composite"
+  steps:
+    - name: Generate app token
+      id: generate-github-app-token
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ inputs.GITHUB_APP_ID }}
+        private-key: ${{ inputs.GITHUB_APP_PRIVATE_KEY }}
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        path: repo
+
+    - name: Download unverified version updates
+      uses: actions/download-artifact@v4
+      with:
+        name: unverified-version-updates
+
+    - name: Create commit
+      id: create-commit
+      env:
+        GH_TOKEN: ${{ steps.generate-github-app-token.outputs.token }}
+        SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
+        VERSION_FILE: ${{ inputs.VERSION_FILE }}
+        API_FILE: ${{ inputs.API_FILE }}
+        MODULES: ${{ inputs.MODULES }}
+        RELEASE_TYPE: ${{ inputs.RELEASE_TYPE }}
+        VERSION_SUFFIX: ${{ inputs.VERSION_SUFFIX }}
+        GITHUB_REPO_URL: ${{ inputs.GITHUB_REPO_URL }}
+        GITHUB_ACTOR: ${{ inputs.GITHUB_ACTOR }}
+        GITHUB_SERVER_URL: ${{ inputs.GITHUB_SERVER_URL }}
+        GITHUB_RUN_ID: ${{ inputs.GITHUB_RUN_ID }}
+      shell: bash
+      run: |
+        set -e
+
+        echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
+        echo "GITHUB_REF=$GITHUB_REF"
+
+        BASE_PATH=$(pwd)
+
+        tar -xvf unverified-version-updates.git.tar
+        cd unverified-version-updates.git
+        RELEASE_TAG=$(git describe --tags --abbrev=0)
+        
+        INCOMING_REPO_PATH="$(pwd)"
+
+        cd ../repo
+
+        if [ -n "$SOURCE_DIR" ]; then
+          if [ ! -d "$SOURCE_DIR" ]; then
+            echo "::error title=Source directory not found::$SOURCE_DIR does not exist."
+            exit 1
+          fi
+          cd "$SOURCE_DIR"
+        fi
+
+        git remote add unsigned "$INCOMING_REPO_PATH"
+        git fetch unsigned
+
+        RELEASE_VERSION=${RELEASE_TAG#"v"}
+
+        if [[ "${RELEASE_TYPE}" = "FULL_MAIN_BRANCH" ]]; then
+          RELEASE_NOTES_URL=$GITHUB_REPO_URL/releases/tag/$RELEASE_TAG
+        else
+          # Use the PR url as the release notes url when doing a 'preview' release
+          RELEASE_NOTES_URL=$( gh pr view "$GITHUB_REF_NAME" --json url -q .url )
+        fi
+        
+        VERSION_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "$VERSION_FILE")
+        VERSION_FILE_INITIAL_SHA=$( git rev-parse "$GITHUB_REF":"$VERSION_FILE_PATH" )
+        VERSION_FILE_RELEASE_SHA=$( git rev-parse "$RELEASE_TAG":"$VERSION_FILE_PATH" )
+        VERSION_FILE_RELEASE_CONTENT=$( git cat-file blob "$RELEASE_TAG":"$VERSION_FILE_PATH" | base64 -w0)
+        VERSION_FILE_POST_RELEASE_CONTENT=$( git cat-file blob unsigned/"$GITHUB_REF_NAME":"$VERSION_FILE_PATH" | base64 -w0)
+
+        # Create temporary branch to push the release commit- required for PREVIEW releases
+        TEMPORARY_BRANCH="release-workflow/temporary/${{ github.run_id }}"
+        
+        gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
+
+        # Parse modules and iterate over them, committing API files and collecting their details
+        # in a json object for later use
+        IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
+
+        API_FILES_JSON="["
+
+        for mod in "${MOD_ARRAY[@]}"; do
+          MOD=$(echo "${mod}" | xargs)
+          API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "${MOD}/${API_FILE}")
+          API_FILE_INITIAL_SHA=$(git rev-parse "$GITHUB_REF":"$API_FILE_PATH")
+          API_FILE_RELEASE_SHA=$(git rev-parse "$RELEASE_TAG":"$API_FILE_PATH")
+          API_FILE_RELEASE_CONTENT=$(git cat-file blob "$RELEASE_TAG":"$API_FILE_PATH" | base64 -w0)
+          API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/"$GITHUB_REF_NAME":"$API_FILE_PATH" | base64 -w0)
+
+          # Commit the API file changes for module
+          gh api --method PUT /repos/:owner/:repo/contents/"$API_FILE_PATH" \
+            --field branch="$TEMPORARY_BRANCH" \
+            --field message="Update public API file for module $MOD for $RELEASE_TAG" \
+            --field sha="$API_FILE_INITIAL_SHA" \
+            --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha'
+          
+
+          API_FILES_JSON="${API_FILES_JSON}{\"module\":\"$MOD\",\"api_file_path\":\"$API_FILE_PATH\",\"api_file_release_sha\":\"$API_FILE_RELEASE_SHA\",\"api_file_post_release_content\":\"$API_FILE_POST_RELEASE_CONTENT\"},"
+        done
+
+        # Remove trailing comma and close JSON array
+        API_FILES_JSON="${API_FILES_JSON%,}]"
+
+        cat << EndOfFile > commit-message.txt
+        $RELEASE_TAG published by $GITHUB_ACTOR
+
+        $GITHUB_ACTOR published release version $RELEASE_VERSION
+        using gha-gradle-library-release-workflow: https://github.com/guardian/gha-gradle-library-release-workflow
+
+        Release-Version: $RELEASE_VERSION
+        Release-Initiated-By: $GITHUB_SERVER_URL/$GITHUB_ACTOR
+        Release-Workflow-Run: $GITHUB_REPO_URL/actions/runs/$GITHUB_RUN_ID
+        Release-Notes: $RELEASE_NOTES_URL
+        EndOfFile
+        
+        # Commit the version file
+        version_commit_id=$(gh api --method PUT /repos/:owner/:repo/contents/"$VERSION_FILE_PATH" \
+          --field branch="$TEMPORARY_BRANCH" \
+          --field message="@commit-message.txt" \
+          --field sha="$VERSION_FILE_INITIAL_SHA" \
+          --field content="$VERSION_FILE_RELEASE_CONTENT" --jq '.commit.sha')
+
+        # Set output
+        cat << EndOfFile >> "$GITHUB_OUTPUT"
+        release-tag=$RELEASE_TAG
+        release-notes-url=$RELEASE_NOTES_URL
+        release-version=$RELEASE_VERSION
+        release-commit-id=$version_commit_id
+        version-file-path=$VERSION_FILE_PATH
+        version-file-release-sha=$VERSION_FILE_RELEASE_SHA
+        version-file-post-release-content=$VERSION_FILE_POST_RELEASE_CONTENT
+        temporary-branch=$TEMPORARY_BRANCH
+        api-files=$API_FILES_JSON
+        EndOfFile
