@@ -53,8 +53,7 @@ on:
         value: ${{ jobs.init.outputs.release-type }}
 
 env:
-  LOCAL_ARTIFACTS_STAGING_PATH: /tmp/artifact_staging
-  COMMITTER_NAME: "@${{github.actor}} using gha-gradle-library-release-workflow"
+  # TODO: Used for cache. Replace cache with artifacts and delete this.
   RUN_ATTEMPT_UID: ${{ github.run_id }}-${{ github.run_attempt }}
   TEMPORARY_BRANCH: release-workflow/temporary/${{ github.run_id }}
   GITHUB_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
@@ -90,7 +89,6 @@ jobs:
           API_FILE: ${{ inputs.API_FILE }}
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
-          PGP_KEY_EMAIL: ${{ needs.init.outputs.pgp-key-email }}
 
   push-release-commit:
     name: 🔒 Push Release Commit
@@ -144,7 +142,6 @@ jobs:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
-          LOCAL_ARTIFACTS_STAGING_PATH: ${{ env.LOCAL_ARTIFACTS_STAGING_PATH }}
           RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
           RELEASE_COMMIT_ID: ${{ needs.push-release-commit.outputs.release-commit-id }}
 

@@ -1,5 +1,6 @@
 name: "Versioning"
 description: "Composite action for library versioning"
+
 inputs:
   SOURCE_DIR:
     description: 'Path to source directory.'
@@ -20,9 +21,7 @@ inputs:
     description: 'Suffix to append to the version.'
     required: false
     default: ''
-  PGP_KEY_EMAIL:
-    description: 'PGP key email for git config.'
-    required: true
+
 outputs:
   library-build-major-java-version:
     description: "The major version of Java (eg '21', '17', or '11') the library should be built with"
@@ -77,12 +76,6 @@ runs:
       with:
         gradle-version: wrapper
 
-    - name: Set up Git user
-      shell: bash
-      run: |
-        git config user.email "${{ inputs.PGP_KEY_EMAIL }}"
-        git config user.name "$COMMITTER_NAME"
-
     - name: Update version and API files
       env:
         SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
@@ -93,6 +86,9 @@ runs:
       shell: bash
       run: |
         set -e
+
+        git config user.email "example@example.com"
+        git config user.name "Ephemeral commit created only for extracting version commit information"
 
         # Check and switch to source directory if provided and exists
         if [ -n "$SOURCE_DIR" ]; then

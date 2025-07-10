@@ -1,5 +1,6 @@
 name: "Create Artifacts"
 description: "Composite action for building and staging unsigned artifacts"
+
 inputs:
   SOURCE_DIR:
     description: 'Path to source directory.'
@@ -22,10 +23,12 @@ inputs:
   RELEASE_COMMIT_ID:
     description: "The git commit-id SHA for the actual release commit"
     required: true
+
 outputs:
   artifact-sha256sums:
     description: "SHA-256 hashes of artifacts"
     value: ${{ steps.record-hashes.outputs.artifact-sha256sums }}
+
 runs:
   using: "composite"
   steps:
