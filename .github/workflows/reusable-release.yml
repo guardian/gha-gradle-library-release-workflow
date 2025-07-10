@@ -25,8 +25,8 @@ on:
       GITHUB_APP_ID:
         description:
           "App ID for a GitHub App that is allowed to push directly to the default branch. Eg, App ID on:
-          https://github.com/organizations/guardian/settings/apps/gu-scala-library-release"
-        default: '807361' # Only for use by the Guardian!
+          https://github.com/organizations/guardian/settings/apps/gu-gradle-library-release"
+        default: '1576314' # Only for use by the Guardian!
         required: false # ...but if you're not the Guardian, you'll want to set this explicitly
         type: string
     secrets:
