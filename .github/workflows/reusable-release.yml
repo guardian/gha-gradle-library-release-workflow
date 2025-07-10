@@ -79,7 +79,7 @@ jobs:
     steps:
       - name: Versioning
         id: versioning
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/versioning@ab/update-to-support-gradle-and-monorepo-configs
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/versioning@main
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
@@ -106,7 +106,7 @@ jobs:
     steps:
       - name: Push Release Commit
         id: push-release-commit
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@ab/update-to-support-gradle-and-monorepo-configs
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@main
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
@@ -133,7 +133,7 @@ jobs:
     steps:
       - name: Create Artifacts
         id: create-artifacts
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@ab/update-to-support-gradle-and-monorepo-configs
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@main
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
@@ -177,7 +177,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Update GitHub
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@ab/update-to-support-gradle-and-monorepo-configs
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@main
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
