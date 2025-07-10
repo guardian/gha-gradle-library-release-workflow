@@ -71,7 +71,7 @@ runs:
         GH_TOKEN=${{ steps.generate-github-app-token.outputs.token }}
         GITHUB_WORKFLOW_FILE=$GITHUB_WORKFLOW_FILE
         GITHUB_WORKFLOW_LINK=[GitHub UI]($GITHUB_WORKFLOW_URL)
-        GITHUB_WORKFLOW_RUN_LINK=[#${{ inputs.GITHUB_RUN_ID }}]($GITHUB_ACTIONS_PATH/runs/${{ inputs.GITHUB_RUN_ID }})
+        GITHUB_WORKFLOW_RUN_LINK=[#${{ github.run_number }}]($GITHUB_ACTIONS_PATH/runs/${{ inputs.GITHUB_RUN_ID }})
         EndOfFile
 
     - name: Clean-up temporary branch that was retaining the now-tagged release commit
