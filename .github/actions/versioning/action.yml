@@ -197,7 +197,6 @@ runs:
     - name: Job summary
       shell: bash
       run: |
-        cd unverified-version-updates.git
         cat << EndOfFile >> $GITHUB_STEP_SUMMARY
         # Release $(git describe --tags --abbrev=0)
         Library built with Java ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}.
