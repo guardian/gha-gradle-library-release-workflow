@@ -184,21 +184,26 @@ runs:
     - name: Create bare repo with unsigned version update commits
       shell: bash
       run: |
+        echo $GITHUB_WORKSPACE
         cd `mktemp -d`
-        git clone --bare $GITHUB_WORKSPACE repo-with-unsigned-version-update-commits.git
-        rm -Rf $GITHUB_WORKSPACE/*
-        mv repo-with-unsigned-version-update-commits.git $GITHUB_WORKSPACE/
-        ls -lR $GITHUB_WORKSPACE
+        git clone --bare $GITHUB_WORKSPACE unverified-version-updates.git
+        tar -cvf unverified-version-updates.git.tar unverified-version-updates.git
+        
+        cat << EndOfFile >> $GITHUB_ENV
+        BARE_REPO_PATH=$(pwd)/unverified-version-updates.git.tar
+        EndOfFile
+
 
     - name: Job summary
       shell: bash
       run: |
+        cd unverified-version-updates.git
         cat << EndOfFile >> $GITHUB_STEP_SUMMARY
-        Release $(git describe --tags --abbrev=0)
+        # Release $(git describe --tags --abbrev=0)
         Library built with Java ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}.
         EndOfFile
 
-    - uses: actions/cache/save@v4
+    - uses: actions/upload-artifact@v4
       with:
-        path: repo-with-unsigned-version-update-commits.git
-        key: repo-with-unsigned-version-update-commits-${{ env.RUN_ATTEMPT_UID }}
+        path: ${{ env.BARE_REPO_PATH }}
+        name: unverified-version-updates

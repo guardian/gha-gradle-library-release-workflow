@@ -84,13 +84,10 @@ runs:
       with:
         path: repo
 
-    # TODO: Replace this with artifact upload/download
-    - name: Restore cache with unsigned version update commits
-      uses: actions/cache/restore@v4
+    - name: Download unverified version updates
+      uses: actions/download-artifact@v4
       with:
-        path: repo-with-unsigned-version-update-commits.git
-        key: repo-with-unsigned-version-update-commits-${{ env.RUN_ATTEMPT_UID }}
-        fail-on-cache-miss: true
+        name: unverified-version-updates
 
     - name: Create commit
       id: create-commit
@@ -115,7 +112,8 @@ runs:
 
         BASE_PATH=$(pwd)
 
-        cd repo-with-unsigned-version-update-commits.git
+        tar -xvf unverified-version-updates.git.tar
+        cd unverified-version-updates.git
         RELEASE_TAG=$(git describe --tags --abbrev=0)
         
         INCOMING_REPO_PATH="$(pwd)"
