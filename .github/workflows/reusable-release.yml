@@ -55,7 +55,6 @@ on:
 env:
   # TODO: Used for cache. Replace cache with artifacts and delete this.
   RUN_ATTEMPT_UID: ${{ github.run_id }}-${{ github.run_attempt }}
-  TEMPORARY_BRANCH: release-workflow/temporary/${{ github.run_id }}
   GITHUB_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
 
 jobs:
@@ -119,7 +118,6 @@ jobs:
           MODULES: ${{ inputs.MODULES }}
           RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
-          TEMPORARY_BRANCH: ${{ env.TEMPORARY_BRANCH }}
           GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -189,7 +187,7 @@ jobs:
           RELEASE_TAG: ${{ needs.push-release-commit.outputs.release-tag }}
           RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
           RELEASE_NOTES_URL: ${{ needs.push-release-commit.outputs.release-notes-url }}
-          TEMPORARY_BRANCH: ${{ env.TEMPORARY_BRANCH }}
+          TEMPORARY_BRANCH: ${{ needs.push-release-commit.outputs.temporary-branch }}
           GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_SERVER_URL: ${{ github.server_url }}

@@ -29,9 +29,6 @@ inputs:
     description: "Version suffix"
     required: false
     default: ""
-  TEMPORARY_BRANCH:
-    description: "Temporary branch name"
-    required: true
   GITHUB_REPO_URL:
     description: "GitHub repo URL"
     required: true
@@ -105,7 +102,6 @@ runs:
         MODULES: ${{ inputs.MODULES }}
         RELEASE_TYPE: ${{ inputs.RELEASE_TYPE }}
         VERSION_SUFFIX: ${{ inputs.VERSION_SUFFIX }}
-        TEMPORARY_BRANCH: ${{ inputs.TEMPORARY_BRANCH }}
         GITHUB_REPO_URL: ${{ inputs.GITHUB_REPO_URL }}
         GITHUB_ACTOR: ${{ inputs.GITHUB_ACTOR }}
         GITHUB_SERVER_URL: ${{ inputs.GITHUB_SERVER_URL }}
@@ -153,6 +149,8 @@ runs:
         VERSION_FILE_POST_RELEASE_CONTENT=$( git cat-file blob unsigned/"$GITHUB_REF_NAME":"$VERSION_FILE_PATH" | base64 -w0)
 
         # Create temporary branch to push the release commit- required for PREVIEW releases
+        TEMPORARY_BRANCH="release-workflow/temporary/${{ github.run_id }}"
+        
         gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
 
         # Parse modules and iterate over them, committing API files and collecting their details
