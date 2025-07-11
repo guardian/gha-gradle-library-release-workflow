@@ -116,9 +116,6 @@ jobs:
           RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
           GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
 
   create-artifacts:
     name: 🎊 Create artifacts
@@ -186,9 +183,6 @@ jobs:
           RELEASE_NOTES_URL: ${{ needs.push-release-commit.outputs.release-notes-url }}
           TEMPORARY_BRANCH: ${{ needs.push-release-commit.outputs.temporary-branch }}
           GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
           VERSION_FILE_PATH: ${{ needs.push-release-commit.outputs.version-file-path }}
           VERSION_FILE_RELEASE_SHA: ${{ needs.push-release-commit.outputs.version-file-release-sha }}
           VERSION_FILE_POST_RELEASE_CONTENT: ${{ needs.push-release-commit.outputs.version-file-post-release-content }}

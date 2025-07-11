@@ -32,15 +32,6 @@ inputs:
   GITHUB_REPO_URL:
     description: "GitHub repo URL"
     required: true
-  GITHUB_ACTOR:
-    description: "GitHub actor"
-    required: true
-  GITHUB_SERVER_URL:
-    description: "GitHub server URL"
-    required: true
-  GITHUB_RUN_ID:
-    description: "GitHub run ID"
-    required: true
 outputs:
   release-tag:
     description: "Release tag"
@@ -98,9 +89,9 @@ runs:
         RELEASE_TYPE: ${{ inputs.RELEASE_TYPE }}
         VERSION_SUFFIX: ${{ inputs.VERSION_SUFFIX }}
         GITHUB_REPO_URL: ${{ inputs.GITHUB_REPO_URL }}
-        GITHUB_ACTOR: ${{ inputs.GITHUB_ACTOR }}
-        GITHUB_SERVER_URL: ${{ inputs.GITHUB_SERVER_URL }}
-        GITHUB_RUN_ID: ${{ inputs.GITHUB_RUN_ID }}
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_SERVER_URL: ${{ github.server_url }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
       shell: bash
       run: |
         set -e
