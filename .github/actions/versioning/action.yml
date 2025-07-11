@@ -182,8 +182,6 @@ runs:
         # Update version file with the new version
         echo "$MAJOR.$MINOR.$PATCH" > "$VERSION_FILE"
 
-        echo "Updated version to $MAJOR.$MINOR.$PATCH"
-
         # Commit the updated version
         git add "$VERSION_FILE"
         git commit -m "chore: update version to $MAJOR.$MINOR.$PATCH"
@@ -194,8 +192,6 @@ runs:
         # Output the comma-separated list of modules with non-patch bumps
         API_UPDATED_MODULES_CSV=$(IFS=, ; echo "${API_UPDATED_MODULES[*]}")
         
-        echo "API updated modules: $API_UPDATED_MODULES_CSV"
-
         cat << EndOfFile >> $GITHUB_OUTPUT
         api-updated-modules=$API_UPDATED_MODULES_CSV
         EndOfFile
@@ -219,7 +215,6 @@ runs:
         cat << EndOfFile >> $GITHUB_STEP_SUMMARY
         # Release $(git describe --tags --abbrev=0)
         Library built with Java ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}.
-        Include api files: ${{ steps.update_version_and_api_files.outputs.api-updated-modules }}
         EndOfFile
 
     - uses: actions/upload-artifact@v4
