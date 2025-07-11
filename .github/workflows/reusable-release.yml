@@ -79,7 +79,7 @@ jobs:
     steps:
       - name: Versioning
         id: versioning
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/versioning@main
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/versioning@ab/only-commit-api-files-if-changed
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
@@ -105,7 +105,7 @@ jobs:
     steps:
       - name: Push Release Commit
         id: push-release-commit
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@main
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@ab/only-commit-api-files-if-changed
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
@@ -133,7 +133,7 @@ jobs:
     steps:
       - name: Create Artifacts
         id: create-artifacts
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@main
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@ab/only-commit-api-files-if-changed
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
@@ -177,7 +177,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Update GitHub
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@main
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@ab/only-commit-api-files-if-changed
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
