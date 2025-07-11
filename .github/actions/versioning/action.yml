@@ -26,6 +26,9 @@ outputs:
   library-build-major-java-version:
     description: "The major version of Java (eg '21', '17', or '11') the library should be built with"
     value: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
+  include-api-files:
+    description: "Whether to include API files in the release commit"
+    value: ${{ steps.update_version_and_api_files.outputs.include-api-files }}
 
 runs:
   using: "composite"
@@ -77,6 +80,7 @@ runs:
         gradle-version: wrapper
 
     - name: Update version and API files
+      id: update_version_and_api_files
       env:
         SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
         VERSION_FILE: ${{ inputs.VERSION_FILE }}
@@ -180,6 +184,13 @@ runs:
 
         # Add version_suffix to the version and tag the commit with the new version number
         git tag "v$MAJOR.$MINOR.$PATCH${VERSION_SUFFIX}"
+        
+        # Set include-api-files output to false if HIGHEST_BUMP is patch
+        if [ "$HIGHEST_BUMP" = "patch" ]; then
+          echo "include-api-files=false" >> $GITHUB_OUTPUT
+        else
+          echo "include-api-files=true" >> $GITHUB_OUTPUT
+        fi
 
     - name: Create bare repo with unsigned version update commits
       shell: bash
