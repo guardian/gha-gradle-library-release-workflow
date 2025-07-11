@@ -69,9 +69,7 @@ outputs:
   temporary-branch:
     description: "Temporary branch"
     value: ${{ steps.create-commit.outputs.temporary-branch }}
-  api-files:
-    description: "API files"
-    value: ${{ steps.create-commit.outputs.api-files }}
+
 runs:
   using: "composite"
   steps:
@@ -158,10 +156,6 @@ runs:
         # in a json object for later use
         IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
 
-        API_FILES_JSON="["
-
-        # Remove trailing comma and close JSON array
-        API_FILES_JSON="${API_FILES_JSON%,}]"
         if [[ "${INCLUDE_API_FILES}" == "true" ]]; then
           for mod in "${MOD_ARRAY[@]}"; do
             MOD=$(echo "${mod}" | xargs)
@@ -210,5 +204,4 @@ runs:
         version-file-release-sha=$VERSION_FILE_RELEASE_SHA
         version-file-post-release-content=$VERSION_FILE_POST_RELEASE_CONTENT
         temporary-branch=$TEMPORARY_BRANCH
-        api-files=$API_FILES_JSON
         EndOfFile

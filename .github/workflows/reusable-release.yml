@@ -102,7 +102,6 @@ jobs:
       version-file-release-sha: ${{ steps.push-release-commit.outputs.version-file-release-sha }}
       version-file-post-release-content: ${{ steps.push-release-commit.outputs.version-file-post-release-content }}
       temporary-branch: ${{ steps.push-release-commit.outputs.temporary-branch }}
-      api-files: ${{ steps.push-release-commit.outputs.api-files }}
     steps:
       - name: Push Release Commit
         id: push-release-commit
@@ -191,7 +190,6 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_RUN_ID: ${{ github.run_id }}
-          API_FILES: ${{ needs.push-release-commit.outputs.api-files }}
           VERSION_FILE_PATH: ${{ needs.push-release-commit.outputs.version-file-path }}
           VERSION_FILE_RELEASE_SHA: ${{ needs.push-release-commit.outputs.version-file-release-sha }}
           VERSION_FILE_POST_RELEASE_CONTENT: ${{ needs.push-release-commit.outputs.version-file-post-release-content }}

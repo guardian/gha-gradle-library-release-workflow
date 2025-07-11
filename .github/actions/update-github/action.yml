@@ -34,10 +34,6 @@ inputs:
   GITHUB_RUN_ID:
     description: "GitHub run ID"
     required: true
-  API_FILES:
-    description: "API files JSON"
-    required: false
-    default: ""
   VERSION_FILE_PATH:
     description: "Version file path"
     required: false
@@ -50,6 +46,7 @@ inputs:
     description: "Version file post release content"
     required: false
     default: ""
+
 runs:
   using: "composite"
   steps:
@@ -84,7 +81,6 @@ runs:
       env:
         RELEASE_TAG: ${{ inputs.RELEASE_TAG }}
         RELEASE_NOTES_URL: ${{ inputs.RELEASE_NOTES_URL }}
-        API_FILES: ${{ inputs.API_FILES }}
         VERSION_FILE_PATH: ${{ inputs.VERSION_FILE_PATH }}
         VERSION_FILE_RELEASE_SHA: ${{ inputs.VERSION_FILE_RELEASE_SHA }}
         VERSION_FILE_POST_RELEASE_CONTENT: ${{ inputs.VERSION_FILE_POST_RELEASE_CONTENT }}
@@ -93,31 +89,6 @@ runs:
       run: |
         gh release create $RELEASE_TAG --verify-tag --generate-notes --notes "Release run: $GITHUB_WORKFLOW_RUN_LINK"
         echo "GitHub Release notes: [$RELEASE_TAG]($RELEASE_NOTES_URL)" >> $GITHUB_STEP_SUMMARY
-
-        # The following is commented out in the original workflow:
-        # API_FILES_JSON="$API_FILES"
-        # echo "$API_FILES_JSON" | jq -c '.[]' | while read -r api_file; do
-        #   MOD=$(echo "$api_file" | jq -r '.module')
-        #   API_FILE_PATH=$(echo "$api_file" | jq -r '.api_file_path')
-        #   API_FILE_RELEASE_SHA=$(echo "$api_file" | jq -r '.api_file_release_sha')
-        #   API_FILE_POST_RELEASE_CONTENT=$(echo "$api_file" | jq -r '.api_file_post_release_content')
-        #   gh api --method PUT /repos/:owner/:repo/contents/$API_FILE_PATH \
-        #     --field message="Update public API file for $MOD for $RELEASE_TAG" \
-        #     --field sha="$API_FILE_RELEASE_SHA" \
-        #     --field content="$API_FILE_POST_RELEASE_CONTENT"
-        # done
-
-        # # Then commit the version file
-        # cat << EndOfFile > commit-message.txt
-        # Post-release of $RELEASE_TAG by @$GITHUB_ACTOR: set version
-        # 
-        # Setting snapshot version after @$GITHUB_ACTOR published $RELEASE_NOTES_URL
-        # EndOfFile
-        # 
-        # gh api --method PUT /repos/:owner/:repo/contents/$VERSION_FILE_PATH \
-        #   --field message="@commit-message.txt" \
-        #   --field sha="$VERSION_FILE_RELEASE_SHA" \
-        #   --field content="$VERSION_FILE_POST_RELEASE_CONTENT"
 
     - name: Update PR with comment
       if: ${{ inputs.RELEASE_TYPE == 'PREVIEW_FEATURE_BRANCH' }}
