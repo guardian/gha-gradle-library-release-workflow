@@ -109,6 +109,7 @@ jobs:
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          INCLUDE_API_FILES: ${{ needs.versioning.outputs.include-api-files }}
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
           API_FILE: ${{ inputs.API_FILE }}
@@ -119,7 +120,6 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_RUN_ID: ${{ github.run_id }}
-          INCLUDE_API_FILES: ${{ needs.versioning.outputs.include-api-files }}
 
   create-artifacts:
     name: 🎊 Create artifacts

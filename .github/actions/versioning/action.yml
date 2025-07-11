@@ -187,10 +187,15 @@ runs:
         
         # Set include-api-files output to false if HIGHEST_BUMP is patch
         if [ "$HIGHEST_BUMP" = "patch" ]; then
-          echo "include-api-files=false" >> $GITHUB_OUTPUT
+          INCLUDE_API_FILES="false"
         else
-          echo "include-api-files=true" >> $GITHUB_OUTPUT
+          INCLUDE_API_FILES="true"
         fi
+
+        # Set the output variable for the Java version
+        cat << EndOfFile >> $GITHUB_OUTPUT
+        include-api-files=$INCLUDE_API_FILES
+        EndOfFile
 
     - name: Create bare repo with unsigned version update commits
       shell: bash
@@ -211,6 +216,7 @@ runs:
         cat << EndOfFile >> $GITHUB_STEP_SUMMARY
         # Release $(git describe --tags --abbrev=0)
         Library built with Java ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}.
+        Include api files: ${{ steps.update_version_and_api_files.outputs.include-api-files }}
         EndOfFile
 
     - uses: actions/upload-artifact@v4
