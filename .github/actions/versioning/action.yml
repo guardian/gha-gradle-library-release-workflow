@@ -26,9 +26,9 @@ outputs:
   library-build-major-java-version:
     description: "The major version of Java (eg '21', '17', or '11') the library should be built with"
     value: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
-  include-api-files:
-    description: "Whether to include API files in the release commit"
-    value: ${{ steps.update_version_and_api_files.outputs.include-api-files }}
+  api-updated-modules:
+    description: "Comma-separated list of modules that have non Patch bumps"
+    value: ${{ steps.update_version_and_api_files.outputs.api-updated-modules }}
 
 runs:
   using: "composite"
@@ -122,6 +122,7 @@ runs:
         IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
 
         HIGHEST_BUMP="patch"
+        API_UPDATED_MODULES=()
 
         for mod in "${MOD_ARRAY[@]}"; do
           MOD=$(echo "${mod}" | xargs)
@@ -155,6 +156,11 @@ runs:
             HIGHEST_BUMP="minor"
           fi
 
+          # Collect modules with non-patch bumps
+          if [ "$BUMP" != "patch" ]; then
+            API_UPDATED_MODULES+=("$MOD")
+          fi
+
           # Add this module's API file to the commit
           git add "$MOD_API_FILE"
 
@@ -184,17 +190,14 @@ runs:
 
         # Add version_suffix to the version and tag the commit with the new version number
         git tag "v$MAJOR.$MINOR.$PATCH${VERSION_SUFFIX}"
-        
-        # Set include-api-files output to false if HIGHEST_BUMP is patch
-        if [ "$HIGHEST_BUMP" = "patch" ]; then
-          INCLUDE_API_FILES="false"
-        else
-          INCLUDE_API_FILES="true"
-        fi
 
-        # Set the output variable for the Java version
+        # Output the comma-separated list of modules with non-patch bumps
+        API_UPDATED_MODULES_CSV=$(IFS=, ; echo "${API_UPDATED_MODULES[*]}")
+        
+        echo "API updated modules: $API_UPDATED_MODULES_CSV"
+
         cat << EndOfFile >> $GITHUB_OUTPUT
-        include-api-files=$INCLUDE_API_FILES
+        api-updated-modules=$API_UPDATED_MODULES_CSV
         EndOfFile
 
     - name: Create bare repo with unsigned version update commits
@@ -216,7 +219,7 @@ runs:
         cat << EndOfFile >> $GITHUB_STEP_SUMMARY
         # Release $(git describe --tags --abbrev=0)
         Library built with Java ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}.
-        Include api files: ${{ steps.update_version_and_api_files.outputs.include-api-files }}
+        Include api files: ${{ steps.update_version_and_api_files.outputs.api-updated-modules }}
         EndOfFile
 
     - uses: actions/upload-artifact@v4
