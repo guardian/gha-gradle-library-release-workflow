@@ -109,11 +109,10 @@ jobs:
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-          INCLUDE_API_FILES: ${{ needs.versioning.outputs.include-api-files }}
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
           API_FILE: ${{ inputs.API_FILE }}
-          MODULES: ${{ inputs.MODULES }}
+          API_UPDATED_MODULES: ${{ needs.versioning.outputs.api-updated-modules }}
           RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
           GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
