@@ -19,8 +19,8 @@ inputs:
     description: "Path to API file"
     required: false
     default: "api/api.txt"
-  MODULES:
-    description: "Comma-separated list of modules"
+  API_UPDATED_MODULES:
+    description: "Comma-separated list of modules that need to be committed."
     required: true
   RELEASE_TYPE:
     description: "Release type"
@@ -31,15 +31,6 @@ inputs:
     default: ""
   GITHUB_REPO_URL:
     description: "GitHub repo URL"
-    required: true
-  GITHUB_ACTOR:
-    description: "GitHub actor"
-    required: true
-  GITHUB_SERVER_URL:
-    description: "GitHub server URL"
-    required: true
-  GITHUB_RUN_ID:
-    description: "GitHub run ID"
     required: true
 outputs:
   release-tag:
@@ -66,9 +57,7 @@ outputs:
   temporary-branch:
     description: "Temporary branch"
     value: ${{ steps.create-commit.outputs.temporary-branch }}
-  api-files:
-    description: "API files"
-    value: ${{ steps.create-commit.outputs.api-files }}
+
 runs:
   using: "composite"
   steps:
@@ -96,13 +85,13 @@ runs:
         SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
         VERSION_FILE: ${{ inputs.VERSION_FILE }}
         API_FILE: ${{ inputs.API_FILE }}
-        MODULES: ${{ inputs.MODULES }}
+        API_UPDATED_MODULES: ${{ inputs.API_UPDATED_MODULES }}
         RELEASE_TYPE: ${{ inputs.RELEASE_TYPE }}
         VERSION_SUFFIX: ${{ inputs.VERSION_SUFFIX }}
         GITHUB_REPO_URL: ${{ inputs.GITHUB_REPO_URL }}
-        GITHUB_ACTOR: ${{ inputs.GITHUB_ACTOR }}
-        GITHUB_SERVER_URL: ${{ inputs.GITHUB_SERVER_URL }}
-        GITHUB_RUN_ID: ${{ inputs.GITHUB_RUN_ID }}
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_SERVER_URL: ${{ github.server_url }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
       shell: bash
       run: |
         set -e
@@ -151,33 +140,25 @@ runs:
         
         gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
 
-        # Parse modules and iterate over them, committing API files and collecting their details
-        # in a json object for later use
-        IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
-
-        API_FILES_JSON="["
-
-        for mod in "${MOD_ARRAY[@]}"; do
-          MOD=$(echo "${mod}" | xargs)
-          API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "${MOD}/${API_FILE}")
-          API_FILE_INITIAL_SHA=$(git rev-parse "$GITHUB_REF":"$API_FILE_PATH")
-          API_FILE_RELEASE_SHA=$(git rev-parse "$RELEASE_TAG":"$API_FILE_PATH")
-          API_FILE_RELEASE_CONTENT=$(git cat-file blob "$RELEASE_TAG":"$API_FILE_PATH" | base64 -w0)
-          API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/"$GITHUB_REF_NAME":"$API_FILE_PATH" | base64 -w0)
-
-          # Commit the API file changes for module
-          gh api --method PUT /repos/:owner/:repo/contents/"$API_FILE_PATH" \
-            --field branch="$TEMPORARY_BRANCH" \
-            --field message="Update public API file for module $MOD for $RELEASE_TAG" \
-            --field sha="$API_FILE_INITIAL_SHA" \
-            --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha'
-          
-
-          API_FILES_JSON="${API_FILES_JSON}{\"module\":\"$MOD\",\"api_file_path\":\"$API_FILE_PATH\",\"api_file_release_sha\":\"$API_FILE_RELEASE_SHA\",\"api_file_post_release_content\":\"$API_FILE_POST_RELEASE_CONTENT\"},"
-        done
-
-        # Remove trailing comma and close JSON array
-        API_FILES_JSON="${API_FILES_JSON%,}]"
+        # Only commit API files for modules in API_UPDATED_MODULES
+        if [ -n "$API_UPDATED_MODULES" ]; then
+          IFS=',' read -ra UPDATED_MODS <<< "$API_UPDATED_MODULES"
+          for mod in "${UPDATED_MODS[@]}"; do
+            MOD=$(echo "${mod}" | xargs)
+            API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "${MOD}/${API_FILE}")
+            API_FILE_INITIAL_SHA=$(git rev-parse "$GITHUB_REF":"$API_FILE_PATH")
+            API_FILE_RELEASE_SHA=$(git rev-parse "$RELEASE_TAG":"$API_FILE_PATH")
+            API_FILE_RELEASE_CONTENT=$(git cat-file blob "$RELEASE_TAG":"$API_FILE_PATH" | base64 -w0)
+            API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/"$GITHUB_REF_NAME":"$API_FILE_PATH" | base64 -w0)
+        
+            # Commit the API file changes for module
+            gh api --method PUT /repos/:owner/:repo/contents/"$API_FILE_PATH" \
+              --field branch="$TEMPORARY_BRANCH" \
+              --field message="Update public API file for module $MOD for $RELEASE_TAG" \
+              --field sha="$API_FILE_INITIAL_SHA" \
+              --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha'
+          done
+        fi
 
         cat << EndOfFile > commit-message.txt
         $RELEASE_TAG published by $GITHUB_ACTOR
@@ -208,5 +189,4 @@ runs:
         version-file-release-sha=$VERSION_FILE_RELEASE_SHA
         version-file-post-release-content=$VERSION_FILE_POST_RELEASE_CONTENT
         temporary-branch=$TEMPORARY_BRANCH
-        api-files=$API_FILES_JSON
         EndOfFile

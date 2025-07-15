@@ -26,6 +26,9 @@ outputs:
   library-build-major-java-version:
     description: "The major version of Java (eg '21', '17', or '11') the library should be built with"
     value: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
+  api-updated-modules:
+    description: "Comma-separated list of modules that have non Patch bumps"
+    value: ${{ steps.update_version_and_api_files.outputs.api-updated-modules }}
 
 runs:
   using: "composite"
@@ -77,6 +80,7 @@ runs:
         gradle-version: wrapper
 
     - name: Update version and API files
+      id: update_version_and_api_files
       env:
         SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
         VERSION_FILE: ${{ inputs.VERSION_FILE }}
@@ -118,6 +122,7 @@ runs:
         IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
 
         HIGHEST_BUMP="patch"
+        API_UPDATED_MODULES=()
 
         for mod in "${MOD_ARRAY[@]}"; do
           MOD=$(echo "${mod}" | xargs)
@@ -151,6 +156,11 @@ runs:
             HIGHEST_BUMP="minor"
           fi
 
+          # Collect modules with non-patch bumps
+          if [ "$BUMP" != "patch" ]; then
+            API_UPDATED_MODULES+=("$MOD")
+          fi
+
           # Add this module's API file to the commit
           git add "$MOD_API_FILE"
 
@@ -172,14 +182,19 @@ runs:
         # Update version file with the new version
         echo "$MAJOR.$MINOR.$PATCH" > "$VERSION_FILE"
 
-        echo "Updated version to $MAJOR.$MINOR.$PATCH"
-
         # Commit the updated version
         git add "$VERSION_FILE"
         git commit -m "chore: update version to $MAJOR.$MINOR.$PATCH"
 
         # Add version_suffix to the version and tag the commit with the new version number
         git tag "v$MAJOR.$MINOR.$PATCH${VERSION_SUFFIX}"
+
+        # Output the comma-separated list of modules with non-patch bumps
+        API_UPDATED_MODULES_CSV=$(IFS=, ; echo "${API_UPDATED_MODULES[*]}")
+        
+        cat << EndOfFile >> $GITHUB_OUTPUT
+        api-updated-modules=$API_UPDATED_MODULES_CSV
+        EndOfFile
 
     - name: Create bare repo with unsigned version update commits
       shell: bash
