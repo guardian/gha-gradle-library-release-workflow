@@ -202,6 +202,10 @@ runs:
         api_updated_modules=$API_UPDATED_MODULES_CSV
         EndOfFile
 
+        cat << EndOfFile >> $GITHUB_STEP_SUMMARY
+        api_updated_modules=$API_UPDATED_MODULES_CSV
+        EndOfFile
+
     - name: Create bare repo with unsigned version update commits
       shell: bash
       run: |
