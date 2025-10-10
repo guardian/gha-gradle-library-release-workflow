@@ -88,6 +88,10 @@ jobs:
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
 
+      - name: Print API Updated Modules
+        run: |
+          echo "api-updated-modules: '${{ steps.versioning.outputs.api-updated-modules }}'"
+
   push-release-commit:
     name: 🔒 Push Release Commit
     needs: [versioning, init]
@@ -104,6 +108,10 @@ jobs:
       version-file-post-release-content: ${{ steps.push-release-commit.outputs.version-file-post-release-content }}
       temporary-branch: ${{ steps.push-release-commit.outputs.temporary-branch }}
     steps:
+      - name: Print API Updated Modules
+        run: |
+          echo "api-updated-modules: '${{ needs.versioning.outputs.api-updated-modules }}'"
+
       - name: Push Release Commit
         id: push-release-commit
         uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@ab/commit-new-api-file
