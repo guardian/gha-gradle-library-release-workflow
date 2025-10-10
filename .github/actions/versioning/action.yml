@@ -138,13 +138,16 @@ runs:
           set -e
 
           if [ $RESULT -ne 0 ]; then
+            # If compatibility check failed then mark it as a major bump and generate new API file
             ./gradlew ":${MOD}:metalavaGenerateSignatureRelease"
             BUMP="major"
           else
             ./gradlew ":${MOD}:metalavaGenerateSignatureRelease"
             if ! cmp -s "$MOD_API_FILE" "$TMP_API_FILE"; then
+              # If the API file has changed then it's a minor bump
               BUMP="minor"
             else
+              # If the API file is the same then it's a patch bump
               BUMP="patch"
             fi
           fi
