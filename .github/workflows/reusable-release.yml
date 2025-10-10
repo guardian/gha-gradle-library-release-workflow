@@ -112,7 +112,7 @@ jobs:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
           API_FILE: ${{ inputs.API_FILE }}
-          API_UPDATED_MODULES: ${{ needs.versioning.outputs.api-updated-modules }}
+          API_UPDATED_MODULES: ${{ needs.versioning.outputs.api_updated_modules }}
           RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
           GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
