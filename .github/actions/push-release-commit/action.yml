@@ -95,6 +95,10 @@ runs:
       shell: bash
       run: |
         set -e
+        
+        # Echo input api updated modules not from environment
+        echo "Input API_UPDATED_MODULES: '${{ inputs.API_UPDATED_MODULES }}'"
+        echo "Env API_UPDATED_MODULES: '$API_UPDATED_MODULES'"
 
         echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
         echo "GITHUB_REF=$GITHUB_REF"
@@ -140,8 +144,6 @@ runs:
         
         gh api --method POST /repos/:owner/:repo/git/refs -f ref="refs/heads/$TEMPORARY_BRANCH" -f sha="$GITHUB_SHA"
 
-        # Print API_UPDATED_MODULES for debugging
-        echo "API_UPDATED_MODULES: '$API_UPDATED_MODULES'"
         # Only commit API files for modules in API_UPDATED_MODULES
         if [ -n "$API_UPDATED_MODULES" ]; then
           IFS=',' read -ra UPDATED_MODS <<< "$API_UPDATED_MODULES"
