@@ -62,10 +62,10 @@ runs:
         GITHUB_WORKFLOW_RUN_LINK=[#${{ github.run_number }}]($GITHUB_ACTIONS_PATH/runs/${{ github.run_id }})
         EndOfFile
 
-#    - name: Clean-up temporary branch that was retaining the now-tagged release commit
-#      shell: bash
-#      run: |
-#        gh api --method DELETE /repos/:owner/:repo/git/refs/heads/${{ inputs.TEMPORARY_BRANCH }}
+    - name: Clean-up temporary branch that was retaining the now-tagged release commit
+      shell: bash
+      run: |
+        gh api --method DELETE /repos/:owner/:repo/git/refs/heads/${{ inputs.TEMPORARY_BRANCH }}
 
     - name: Create Github Release and update version.txt post-release
       if: ${{ inputs.RELEASE_TYPE == 'FULL_MAIN_BRANCH' }}

@@ -95,10 +95,6 @@ runs:
       shell: bash
       run: |
         set -e
-        
-        # Echo input api updated modules not from environment
-        echo "Input API_UPDATED_MODULES: '${{ inputs.API_UPDATED_MODULES }}'"
-        echo "Env API_UPDATED_MODULES: '$API_UPDATED_MODULES'"
 
         echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
         echo "GITHUB_REF=$GITHUB_REF"
@@ -147,22 +143,13 @@ runs:
         # Only commit API files for modules in API_UPDATED_MODULES
         if [ -n "$API_UPDATED_MODULES" ]; then
           IFS=',' read -ra UPDATED_MODS <<< "$API_UPDATED_MODULES"
-          # Echo list of modules
-          echo "Modules with updated API files: ${UPDATED_MODS[*]}"
           for mod in "${UPDATED_MODS[@]}"; do
-            echo "Processing module: '$mod'"
             MOD=$(echo "${mod}" | xargs)
             API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "${MOD}/${API_FILE}")
             API_FILE_INITIAL_SHA=$(git rev-parse "$GITHUB_REF":"$API_FILE_PATH")
             API_FILE_RELEASE_SHA=$(git rev-parse "$RELEASE_TAG":"$API_FILE_PATH")
             API_FILE_RELEASE_CONTENT=$(git cat-file blob "$RELEASE_TAG":"$API_FILE_PATH" | base64 -w0)
             API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/"$GITHUB_REF_NAME":"$API_FILE_PATH" | base64 -w0)
-            
-            echo "API file path: '$API_FILE_PATH'"
-            echo "API file initial SHA: '$API_FILE_INITIAL_SHA'"
-            echo "API file release SHA: '$API_FILE_RELEASE_SHA'"
-            echo "API file release content (base64): '$API_FILE_RELEASE_CONTENT'"
-            echo "API file post-release content (base64): '$API_FILE_POST_RELEASE_CONTENT'"
         
             # Commit the API file changes for module
             gh api --method PUT /repos/:owner/:repo/contents/"$API_FILE_PATH" \

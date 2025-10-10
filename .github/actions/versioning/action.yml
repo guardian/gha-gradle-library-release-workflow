@@ -166,7 +166,6 @@ runs:
 
           # Add this module's API file to the commit
           git add "$MOD_API_FILE"
-          echo "Updated API file for module '$MOD' with a '$BUMP' version bump."
 
           rm -f "$TMP_API_FILE"
         done
@@ -195,8 +194,6 @@ runs:
 
         # Output the comma-separated list of modules with non-patch bumps
         API_UPDATED_MODULES_CSV=$(IFS=, ; echo "${API_UPDATED_MODULES[*]}")
-        
-        echo "API updated modules: $API_UPDATED_MODULES_CSV"
         
         cat << EndOfFile >> $GITHUB_OUTPUT
         api-updated-modules=$API_UPDATED_MODULES_CSV
