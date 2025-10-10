@@ -88,10 +88,6 @@ jobs:
           VERSION_FILE: ${{ inputs.VERSION_FILE }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
 
-      - name: Print API Updated Modules
-        run: |
-          echo "api-updated-modules: '${{ steps.versioning.outputs.api-updated-modules }}'"
-
   push-release-commit:
     name: 🔒 Push Release Commit
     needs: [versioning, init]
@@ -108,10 +104,6 @@ jobs:
       version-file-post-release-content: ${{ steps.push-release-commit.outputs.version-file-post-release-content }}
       temporary-branch: ${{ steps.push-release-commit.outputs.temporary-branch }}
     steps:
-      - name: Print API Updated Modules
-        run: |
-          echo "api-updated-modules: '${{ needs.versioning.outputs.api-updated-modules }}'"
-
       - name: Push Release Commit
         id: push-release-commit
         uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@ab/commit-new-api-file
@@ -125,73 +117,73 @@ jobs:
           RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
           VERSION_SUFFIX: ${{ needs.init.outputs.version-suffix }}
           GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
-#
-#  create-artifacts:
-#    name: 🎊 Create artifacts
-#    needs: [init, versioning, push-release-commit]
-#    runs-on: ubuntu-latest
-#    env:
-#      RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
-#      LIBRARY_BUILD_MAJOR_JAVA_VERSION: ${{ needs.versioning.outputs.library-build-major-java-version }}
-#    outputs:
-#      artifact-sha256sums: ${{ steps.create-artifacts.outputs.artifact-sha256sums }}
-#    steps:
-#      - name: Create Artifacts
-#        id: create-artifacts
-#        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@ab/commit-new-api-file
-#        with:
-#          SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
-#          MODULES: ${{ inputs.MODULES }}
-#          VERSION_FILE: ${{ inputs.VERSION_FILE }}
-#          RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
-#          RELEASE_COMMIT_ID: ${{ needs.push-release-commit.outputs.release-commit-id }}
-#
-#  sign:
-#    name: 🔒 Sign
-#    needs: [init, push-release-commit, create-artifacts]
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: guardian/gha-scala-library-release-workflow/actions/sign@main
-#        with:
-#          github-app-id: ${{ inputs.GITHUB_APP_ID }}
-#          github-app-private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-#          pgp-key-email: ${{ needs.init.outputs.pgp-key-email }}
-#          pgp-key-fingerprint: ${{ needs.init.outputs.pgp-key-fingerprint }}
-#          pgp-private-key: ${{ secrets.PGP_PRIVATE_KEY }}
-#          release-type: ${{ needs.init.outputs.release-type }}
-#          release-tag: ${{ needs.push-release-commit.outputs.release-tag }}
-#          release-commit-id: ${{ needs.push-release-commit.outputs.release-commit-id }}
-#          artifact-sha256sums: ${{ needs.create-artifacts.outputs.artifact-sha256sums }}
-#
-#  sonatype-release:
-#    name: 🔒 Sonatype Release
-#    needs: [push-release-commit, sign]
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: guardian/gha-scala-library-release-workflow/actions/sonatype-release@main
-#        with:
-#          release-version: ${{ needs.push-release-commit.outputs.release-version }}
-#          sonatype-token: ${{ secrets.SONATYPE_TOKEN }}
-#
-#  update-github:
-#    name: 🔒 Update GitHub
-#    needs:  [init, push-release-commit, sign, sonatype-release]
-#    runs-on: ubuntu-latest
-#    permissions:
-#      contents: write
-#      pull-requests: write
-#    steps:
-#      - name: Update GitHub
-#        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@ab/commit-new-api-file
-#        with:
-#          GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
-#          GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-#          RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
-#          RELEASE_TAG: ${{ needs.push-release-commit.outputs.release-tag }}
-#          RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
-#          RELEASE_NOTES_URL: ${{ needs.push-release-commit.outputs.release-notes-url }}
-#          TEMPORARY_BRANCH: ${{ needs.push-release-commit.outputs.temporary-branch }}
-#          GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
-#          VERSION_FILE_PATH: ${{ needs.push-release-commit.outputs.version-file-path }}
-#          VERSION_FILE_RELEASE_SHA: ${{ needs.push-release-commit.outputs.version-file-release-sha }}
-#          VERSION_FILE_POST_RELEASE_CONTENT: ${{ needs.push-release-commit.outputs.version-file-post-release-content }}
+
+  create-artifacts:
+    name: 🎊 Create artifacts
+    needs: [init, versioning, push-release-commit]
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
+      LIBRARY_BUILD_MAJOR_JAVA_VERSION: ${{ needs.versioning.outputs.library-build-major-java-version }}
+    outputs:
+      artifact-sha256sums: ${{ steps.create-artifacts.outputs.artifact-sha256sums }}
+    steps:
+      - name: Create Artifacts
+        id: create-artifacts
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@ab/commit-new-api-file
+        with:
+          SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
+          MODULES: ${{ inputs.MODULES }}
+          VERSION_FILE: ${{ inputs.VERSION_FILE }}
+          RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
+          RELEASE_COMMIT_ID: ${{ needs.push-release-commit.outputs.release-commit-id }}
+
+  sign:
+    name: 🔒 Sign
+    needs: [init, push-release-commit, create-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: guardian/gha-scala-library-release-workflow/actions/sign@main
+        with:
+          github-app-id: ${{ inputs.GITHUB_APP_ID }}
+          github-app-private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          pgp-key-email: ${{ needs.init.outputs.pgp-key-email }}
+          pgp-key-fingerprint: ${{ needs.init.outputs.pgp-key-fingerprint }}
+          pgp-private-key: ${{ secrets.PGP_PRIVATE_KEY }}
+          release-type: ${{ needs.init.outputs.release-type }}
+          release-tag: ${{ needs.push-release-commit.outputs.release-tag }}
+          release-commit-id: ${{ needs.push-release-commit.outputs.release-commit-id }}
+          artifact-sha256sums: ${{ needs.create-artifacts.outputs.artifact-sha256sums }}
+
+  sonatype-release:
+    name: 🔒 Sonatype Release
+    needs: [push-release-commit, sign]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: guardian/gha-scala-library-release-workflow/actions/sonatype-release@main
+        with:
+          release-version: ${{ needs.push-release-commit.outputs.release-version }}
+          sonatype-token: ${{ secrets.SONATYPE_TOKEN }}
+
+  update-github:
+    name: 🔒 Update GitHub
+    needs:  [init, push-release-commit, sign, sonatype-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Update GitHub
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@ab/commit-new-api-file
+        with:
+          GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          RELEASE_TYPE: ${{ needs.init.outputs.release-type }}
+          RELEASE_TAG: ${{ needs.push-release-commit.outputs.release-tag }}
+          RELEASE_VERSION: ${{ needs.push-release-commit.outputs.release-version }}
+          RELEASE_NOTES_URL: ${{ needs.push-release-commit.outputs.release-notes-url }}
+          TEMPORARY_BRANCH: ${{ needs.push-release-commit.outputs.temporary-branch }}
+          GITHUB_REPO_URL: ${{ env.GITHUB_REPO_URL }}
+          VERSION_FILE_PATH: ${{ needs.push-release-commit.outputs.version-file-path }}
+          VERSION_FILE_RELEASE_SHA: ${{ needs.push-release-commit.outputs.version-file-release-sha }}
+          VERSION_FILE_POST_RELEASE_CONTENT: ${{ needs.push-release-commit.outputs.version-file-post-release-content }}
