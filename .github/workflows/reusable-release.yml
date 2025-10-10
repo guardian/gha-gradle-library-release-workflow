@@ -76,6 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       library-build-major-java-version: ${{ steps.versioning.outputs.library-build-major-java-version }}
+      api-updated-modules: ${{ steps.versioning.outputs.api-updated-modules }}
     steps:
       - name: Versioning
         id: versioning
