@@ -106,7 +106,7 @@ jobs:
     steps:
       - name: Push Release Commit
         id: push-release-commit
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@main
+        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@ab/health/read-api-file-content-from-file-not-from-variable
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
