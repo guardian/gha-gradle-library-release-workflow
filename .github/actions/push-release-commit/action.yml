@@ -148,7 +148,9 @@ runs:
             API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "${MOD}/${API_FILE}")
             API_FILE_INITIAL_SHA=$(git rev-parse "$GITHUB_REF":"$API_FILE_PATH")
             API_FILE_RELEASE_SHA=$(git rev-parse "$RELEASE_TAG":"$API_FILE_PATH")
-            API_FILE_RELEASE_CONTENT=$(git cat-file blob "$RELEASE_TAG":"$API_FILE_PATH" | base64 -w0)
+            # Write the base64 content to a file rather than passing it inline, to avoid
+            # "Argument list too long" errors for large API files (exceeding ARG_MAX).
+            git cat-file blob "$RELEASE_TAG":"$API_FILE_PATH" | base64 -w0 > api-file-release-content.txt
             API_FILE_POST_RELEASE_CONTENT=$(git cat-file blob unsigned/"$GITHUB_REF_NAME":"$API_FILE_PATH" | base64 -w0)
         
             # Commit the API file changes for module
@@ -156,7 +158,7 @@ runs:
               --field branch="$TEMPORARY_BRANCH" \
               --field message="Update public API file for module $MOD for $RELEASE_TAG" \
               --field sha="$API_FILE_INITIAL_SHA" \
-              --field content="$API_FILE_RELEASE_CONTENT" --jq '.commit.sha'
+              --field content=@api-file-release-content.txt --jq '.commit.sha'
           done
         fi
 
