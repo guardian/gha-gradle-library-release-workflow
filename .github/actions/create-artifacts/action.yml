@@ -7,7 +7,9 @@ inputs:
     required: false
     default: ''
   MODULES:
-    description: 'Comma-separated list of module names to build.'
+    description:
+      'Comma-separated list of Gradle module paths to build (e.g. "core,utils"). Nested modules are supported using
+      Gradle path notation, with or without a leading colon (e.g. ":source:api,guardian:front:lib").'
     required: true
   VERSION_FILE:
     description: 'Path to version file relative to the source directory.'
@@ -70,7 +72,15 @@ runs:
           IFS=',' read -ra MOD_ARRAY <<< "$MODULES"
 
           for mod in "${MOD_ARRAY[@]}"; do
-            MOD=$(echo "${mod}" | xargs)
+            # Normalise the module to Gradle path notation without a leading colon, eg 'source:api'.
+            # Accepts ':source:api', 'source:api' and 'source/api'.
+            MOD=$(echo "${mod}" | xargs | tr '/' ':' | sed -E 's|^:+||; s|:+$||; s|:+|:|g')
+
+            if [ -z "$MOD" ]; then
+              echo "::error title=Invalid module::MODULES contains an empty module name."
+              exit 1
+            fi
+
             ./gradlew ":${MOD}:publishReleasePublicationToCustomRepository" -Prepo.local=${{ inputs.LOCAL_ARTIFACTS_STAGING_PATH }}
           done
         fi

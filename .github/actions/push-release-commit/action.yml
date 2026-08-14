@@ -20,7 +20,9 @@ inputs:
     required: false
     default: "api/api.txt"
   API_UPDATED_MODULES:
-    description: "Comma-separated list of modules that need to be committed."
+    description:
+      "Comma-separated list of modules that need to be committed, in Gradle path notation
+      (e.g. \"core,source:api\")."
     required: true
   RELEASE_TYPE:
     description: "Release type"
@@ -144,8 +146,11 @@ runs:
         if [ -n "$API_UPDATED_MODULES" ]; then
           IFS=',' read -ra UPDATED_MODS <<< "$API_UPDATED_MODULES"
           for mod in "${UPDATED_MODS[@]}"; do
-            MOD=$(echo "${mod}" | xargs)
-            API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep "${MOD}/${API_FILE}")
+            # Normalise the module to Gradle path notation without a leading colon, eg 'source:api',
+            # then derive its directory, eg 'source/api'
+            MOD=$(echo "${mod}" | xargs | tr '/' ':' | sed -E 's|^:+||; s|:+$||; s|:+|:|g')
+            MOD_DIR="${MOD//://}"
+            API_FILE_PATH=$(git diff-tree --no-commit-id --name-only -r "$RELEASE_TAG" | grep -F -- "${MOD_DIR}/${API_FILE}")
             API_FILE_INITIAL_SHA=$(git rev-parse "$GITHUB_REF":"$API_FILE_PATH")
             API_FILE_RELEASE_SHA=$(git rev-parse "$RELEASE_TAG":"$API_FILE_PATH")
             # Write the base64 content to a file rather than passing it inline, to avoid
@@ -156,7 +161,7 @@ runs:
             # Commit the API file changes for module
             gh api --method PUT /repos/:owner/:repo/contents/"$API_FILE_PATH" \
               --field branch="$TEMPORARY_BRANCH" \
-              --field message="Update public API file for module $MOD for $RELEASE_TAG" \
+              --field message="Update public API file for module :$MOD for $RELEASE_TAG" \
               --field sha="$API_FILE_INITIAL_SHA" \
               --field content=@api-file-release-content.txt --jq '.commit.sha'
           done
