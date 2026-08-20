@@ -7,7 +7,9 @@ inputs:
     required: false
     default: ''
   MODULES:
-    description: 'Comma-separated list of module names to build.'
+    description:
+      'Comma-separated list of Gradle module paths to build (e.g. "core,utils"). Nested modules are supported using
+      Gradle path notation, with or without a leading colon (e.g. ":source:api,guardian:front:lib").'
     required: true
   API_FILE:
     description: 'Path to API file relative to the module directory.'
@@ -27,7 +29,7 @@ outputs:
     description: "The major version of Java (eg '21', '17', or '11') the library should be built with"
     value: ${{ steps.establish_java_for_library_build.outputs.library-build-major-java-version }}
   api-updated-modules:
-    description: "Comma-separated list of modules that have non Patch bumps"
+    description: "Comma-separated list of modules (in Gradle path notation, without a leading colon) that have non Patch bumps"
     value: ${{ steps.update_version_and_api_files.outputs.api-updated-modules }}
 
 runs:
@@ -125,8 +127,23 @@ runs:
         API_UPDATED_MODULES=()
 
         for mod in "${MOD_ARRAY[@]}"; do
-          MOD=$(echo "${mod}" | xargs)
-          MOD_API_FILE="${MOD}/${API_FILE}"
+          # Normalise the module to Gradle path notation without a leading colon, eg 'source:api'.
+          # Accepts ':source:api', 'source:api' and 'source/api'.
+          MOD=$(echo "${mod}" | xargs | tr '/' ':' | sed -E 's|^:+||; s|:+$||; s|:+|:|g')
+
+          if [ -z "$MOD" ]; then
+            echo "::error title=Invalid module::MODULES contains an empty module name."
+            exit 1
+          fi
+
+          # The directory of a nested module mirrors its Gradle path, eg ':source:api' lives in 'source/api'
+          MOD_DIR="${MOD//://}"
+          MOD_API_FILE="${MOD_DIR}/${API_FILE}"
+
+          if [ ! -f "$MOD_API_FILE" ]; then
+            echo "::error title=API file not found::Expected API file '$MOD_API_FILE' for module ':$MOD' does not exist."
+            exit 1
+          fi
 
           TMP_API_FILE=$(mktemp)
           cp "$MOD_API_FILE" "$TMP_API_FILE"

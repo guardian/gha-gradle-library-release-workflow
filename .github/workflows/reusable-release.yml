@@ -9,7 +9,9 @@ on:
         default: ''
         type: string
       MODULES:
-        description: 'Comma-separated list of module names to build (e.g. "core,utils,api").'
+        description:
+          'Comma-separated list of Gradle module paths to build (e.g. "core,utils,api"). Nested modules are supported
+          using Gradle path notation, with or without a leading colon (e.g. ":source:api,guardian:front:lib").'
         required: true
         type: string
       API_FILE:
