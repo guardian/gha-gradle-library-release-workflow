@@ -68,7 +68,7 @@ jobs:
       version-suffix: ${{ steps.act.outputs.version-suffix }}
     steps:
       - id: act
-        uses: guardian/gha-scala-library-release-workflow/actions/init@main
+        uses: guardian/gha-scala-library-release-workflow/actions/init@v2
         with:
           pgp-private-key: ${{ secrets.PGP_PRIVATE_KEY }}
 
@@ -82,7 +82,7 @@ jobs:
     steps:
       - name: Versioning
         id: versioning
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/versioning@main
+        uses: $/.github/actions/versioning
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
@@ -108,7 +108,7 @@ jobs:
     steps:
       - name: Push Release Commit
         id: push-release-commit
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/push-release-commit@main
+        uses: $/.github/actions/push-release-commit
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
@@ -132,7 +132,7 @@ jobs:
     steps:
       - name: Create Artifacts
         id: create-artifacts
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/create-artifacts@main
+        uses: $/.github/actions/create-artifacts
         with:
           SOURCE_DIR: ${{ inputs.SOURCE_DIR }}
           MODULES: ${{ inputs.MODULES }}
@@ -145,7 +145,7 @@ jobs:
     needs: [init, push-release-commit, create-artifacts]
     runs-on: ubuntu-latest
     steps:
-      - uses: guardian/gha-scala-library-release-workflow/actions/sign@main
+      - uses: guardian/gha-scala-library-release-workflow/actions/sign@v2
         with:
           github-app-id: ${{ inputs.GITHUB_APP_ID }}
           github-app-private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
@@ -162,7 +162,7 @@ jobs:
     needs: [push-release-commit, sign]
     runs-on: ubuntu-latest
     steps:
-      - uses: guardian/gha-scala-library-release-workflow/actions/sonatype-release@main
+      - uses: guardian/gha-scala-library-release-workflow/actions/sonatype-release@v2
         with:
           release-version: ${{ needs.push-release-commit.outputs.release-version }}
           sonatype-token: ${{ secrets.SONATYPE_TOKEN }}
@@ -176,7 +176,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Update GitHub
-        uses: guardian/gha-gradle-library-release-workflow/.github/actions/update-github@main
+        uses: $/.github/actions/update-github
         with:
           GITHUB_APP_ID: ${{ inputs.GITHUB_APP_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
